@@ -29,3 +29,7 @@ design/uploads/*.xlsx
 .venv/
 __pycache__/
 *.pyc
+
+# Streamlit secrets — the shared access passphrase. Never committed; set the
+# same value in Streamlit Cloud's Settings -> Secrets for the deployed app.
+.streamlit/secrets.toml

@@ -25,6 +25,7 @@ model/trim/size drill-down, budget vs actual, top products, discount leakage,
 and stock. Accessory attach-rate is NOT yet ported — flagged explicitly in the
 footer rather than silently omitted.
 """
+import hmac
 import sqlite3
 import datetime as dt
 from pathlib import Path
@@ -35,6 +36,44 @@ import streamlit as st
 DB_PATH = Path(__file__).parent / "snapshot.sqlite"
 
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
+
+
+# ---------------------------------------------------------------- access gate
+#
+# The deployed app is reachable by anyone with the URL — Streamlit Community
+# Cloud's free tier has no built-in viewer allow-list, only a paid one. This
+# is real revenue/margin/budget data, so a simple shared-passphrase gate
+# stands in for that: nothing below this function runs until it passes.
+#
+# The passphrase lives ONLY in Streamlit Cloud's secrets store (Settings ->
+# Secrets in the app dashboard) or a local .streamlit/secrets.toml — never in
+# the repo. hmac.compare_digest avoids leaking the passphrase length/prefix
+# through response-timing differences.
+def check_password():
+    def on_submit():
+        entered = st.session_state.get("password_input", "")
+        expected = st.secrets.get("app_password", "")
+        st.session_state["password_ok"] = bool(expected) and hmac.compare_digest(entered, expected)
+        if "password_input" in st.session_state:
+            del st.session_state["password_input"]  # never keep the passphrase in memory longer than needed
+
+    if st.session_state.get("password_ok"):
+        return True
+
+    st.title("Sales Dashboard")
+    st.text_input("Access code", type="password", key="password_input", on_change=on_submit)
+    if "password_ok" in st.session_state and not st.session_state["password_ok"]:
+        st.error("Incorrect access code.")
+    if not st.secrets.get("app_password"):
+        st.warning(
+            "No app_password is configured in Streamlit secrets — the gate cannot pass. "
+            "Set it under this app's Settings -> Secrets on Streamlit Cloud."
+        )
+    return False
+
+
+if not check_password():
+    st.stop()
 
 # st.metric truncates long ZAR figures with an ellipsis at narrower column
 # widths (e.g. "ZAR 82,409,..."). The value is intact in the DOM either way —
