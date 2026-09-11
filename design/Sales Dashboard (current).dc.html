@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="background:#f9f9f7; color:#0b0b0b; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; font-size:14px; line-height:1.45; padding:28px 32px 56px">
+
+  <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; margin-bottom:22px">
+    <div>
+      <h1 style="font-size:20px; font-weight:600; margin:0 0 3px; letter-spacing:-0.01em">Sales Dashboard</h1>
+      <div style="color:#52514e; font-size:13px">Specialized Paarl · 2023-07-01 to 2026-09-10 · all figures ZAR</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center">
+      <button style="font:inherit; background:#2a78d6; border:1px solid transparent; border-radius:7px; padding:6px 11px; color:#fff; font-weight:500; cursor:pointer">Re-sync</button>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:11px 14px; margin-bottom:20px; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:10px">
+    <div style="display:flex; gap:2px; background:#eeeeea; border-radius:8px; padding:2px">
+      <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">MTD</button>
+      <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">30d</button>
+      <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">90d</button>
+      <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">YTD</button>
+      <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">12m</button>
+      <button style="border:none; background:#fcfcfb; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#0b0b0b; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); cursor:pointer">All time</button>
+    </div>
+    <label style="color:#52514e; font-size:12px; display:inline-flex; gap:6px; align-items:center">From <input type="date" style="font:inherit; color:#0b0b0b; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px"></label>
+    <label style="color:#52514e; font-size:12px; display:inline-flex; gap:6px; align-items:center">To <input type="date" style="font:inherit; color:#0b0b0b; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px"></label>
+    <button style="font:inherit; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px; color:#0b0b0b; cursor:pointer">Apply</button>
+    <div style="flex:1 1 auto"></div>
+    <div style="font-size:12px; color:#52514e; min-height:1em">Showing all time</div>
+  </div>
+
+  <section style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); margin-bottom:16px">
+    <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <div style="color:#52514e; font-size:12px; margin-bottom:6px">Revenue (ex-VAT, net of discount)</div>
+      <div style="font-weight:600; letter-spacing:-0.02em; font-size:34px; line-height:1.1">ZAR 38,412,905</div>
+      <div style="color:#898781; font-size:12px; margin-top:5px">14,286 transactions</div>
+    </div>
+    <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <div style="color:#52514e; font-size:12px; margin-bottom:6px">Gross profit</div>
+      <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 12,202,977</div>
+      <div style="color:#898781; font-size:12px; margin-top:5px">Revenue less cost of goods sold</div>
+    </div>
+    <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <div style="color:#52514e; font-size:12px; margin-bottom:6px">Gross margin</div>
+      <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">31.8%</div>
+      <div style="color:#898781; font-size:12px; margin-top:5px">ZAR 26.2m COGS</div>
+    </div>
+    <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <div style="color:#52514e; font-size:12px; margin-bottom:6px">Average sale value</div>
+      <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 2,688</div>
+      <div style="color:#898781; font-size:12px; margin-top:5px">38,921 units sold</div>
+    </div>
+  </section>
+
+  <div style="display:grid; gap:16px; grid-template-columns:1fr">
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Budget vs actual</h2>
+        <div style="color:#898781; font-size:12px">Compared over 2023-07-01 to 2026-08-31</div>
+      </header>
+      <div style="color:#898781; font-size:12px">Budget covers 2023-07 to 2026-08; only the 7 budgeted categories are compared. The window was narrowed to where the budget and the trade data overlap, so both sides cover the same months. A further ZAR 240,288 of revenue sits in unbudgeted categories — shown for context, not counted as variance. Partial months are prorated by day.</div>
+      <section style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); margin-top:12px">
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Budget for the period</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 38,210,000</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Actual</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 38,172,617</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">Includes off-Lightspeed adjustments</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Variance</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">−ZAR 37,383</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">−0.1% vs budget</div>
+        </div>
+      </section>
+      <div style="overflow-x:auto; margin-top:12px">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Budget (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Actual (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Variance (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Variance %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ budgetRows }}" as="r" hint-placeholder-count="7">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.cat }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.budget }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.actual }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.variance }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.pct }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Sales by category</h2>
+        <button style="background:none; border:none; padding:2px 4px; color:#52514e; font:inherit; font-size:12px; text-decoration:underline; cursor:pointer">Show table</button>
+      </header>
+      <div style="color:#898781; font-size:12px">Top-level Lightspeed category · revenue in ZAR, ex-VAT net of discounts</div>
+      <div>
+        <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:3px 6px">
+          <div style="color:#52514e; font-size:13px"></div>
+          <div></div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">Revenue</div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">Margin</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:2px; margin-top:10px">
+          <sc-for list="{{ catRows }}" as="r" hint-placeholder-count="9">
+            <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:3px 6px; border-radius:6px">
+              <div style="color:#52514e; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.cat }}</div>
+              <div style="background:#eeeeea; border-radius:3px; height:16px; overflow:hidden">
+                <div style="height:16px; background:#2a78d6; border-radius:0 4px 4px 0; width:{{ r.w }}"></div>
+              </div>
+              <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px">{{ r.val }}</div>
+              <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">{{ r.pct }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:7px 6px 3px; margin-top:4px; border-top:2px solid #c3c2b7; font-weight:600">
+          <div style="color:#0b0b0b; font-size:13px">Total</div>
+          <div></div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px">38,412,905</div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">31.8%</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Bike sales by model</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <div style="display:flex; gap:2px; background:#eeeeea; border-radius:8px; padding:2px">
+            <button style="border:none; background:#fcfcfb; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#0b0b0b; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); cursor:pointer">Complete bikes</button>
+            <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">All forms</button>
+          </div>
+          <button style="background:none; border:none; padding:2px 4px; color:#52514e; font:inherit; font-size:12px; text-decoration:underline; cursor:pointer">Show table</button>
+        </div>
+      </header>
+      <nav style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:8px 0 2px; font-size:13px">
+        <span style="color:#0b0b0b; font-weight:600">All models</span>
+      </nav>
+      <div style="color:#898781; font-size:12px">Click a model to see its trims, then a trim to see its size mix. Model, trim and size are read from the item description (the category tree supplies vocabulary and a cross-check). Complete bikes only: ZAR 14,980,220. A further ZAR 2,861,890 of bike-category revenue is framesets, bare frames, build kits and rentals — switch to “All forms” to include it.</div>
+      <div>
+        <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:3px 6px">
+          <div></div>
+          <div></div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">Revenue</div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">Margin</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:2px; margin-top:10px">
+          <sc-for list="{{ modelRows }}" as="r" hint-placeholder-count="10">
+            <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:3px 6px; border-radius:6px; cursor:pointer">
+              <div style="color:#52514e; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.cat }} ›</div>
+              <div style="background:#eeeeea; border-radius:3px; height:16px; overflow:hidden">
+                <div style="height:16px; background:#2a78d6; border-radius:0 4px 4px 0; width:{{ r.w }}"></div>
+              </div>
+              <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px">{{ r.val }}</div>
+              <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">{{ r.pct }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid; grid-template-columns:minmax(96px,148px) 1fr minmax(96px,auto) 62px; gap:12px; align-items:center; padding:7px 6px 3px; margin-top:4px; border-top:2px solid #c3c2b7; font-weight:600">
+          <div style="color:#0b0b0b; font-size:13px">Total</div>
+          <div></div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px">14,980,220</div>
+          <div style="text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:#52514e">21.6%</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Top 10 products</h2>
+        <div style="color:#898781; font-size:12px">By revenue · ZAR, ex-VAT net of discounts</div>
+      </header>
+      <div style="overflow-x:auto">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">#</th>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Product</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Units</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Revenue</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Gross profit</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ topRows }}" as="r" hint-placeholder-count="10">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; color:#898781; width:26px; text-align:right">{{ r.rank }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.product }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right">{{ r.category }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.units }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.revenue }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.gp }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.margin }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Accessory attach rate on bike sales</h2>
+      </header>
+      <div style="color:#898781; font-size:12px">Non-bike items sold in the same transaction as a complete bike. A second bike in the same sale is not counted as an accessory.</div>
+      <section style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); margin-top:12px">
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Bike transactions</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">1,062</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">With an accessory</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">66.3%</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">704 of 1,062</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Attached revenue</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 2,184,900</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">4,318 units</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Per bike sold</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 2,057</div>
+        </div>
+      </section>
+      <div style="overflow-x:auto; margin-top:12px">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Attached category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Units</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Revenue (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Gross profit (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ attachRows }}" as="r" hint-placeholder-count="5">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left">{{ r.cat }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.units }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.revenue }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.gp }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.margin }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Stock on hand &amp; stock turn</h2>
+        <div style="color:#898781; font-size:12px">Stock as held now · trade measured over the 12 months to 2026-09-10</div>
+      </header>
+      <div style="color:#898781; font-size:12px">Not affected by the period filter above: stock is a point-in-time position, so pairing it with an arbitrary date range would give a meaningless turn. Turn is COGS ÷ closing stock at cost — a proxy for the textbook COGS ÷ average stock, since Lightspeed exposes only a current snapshot. A daily history is now being recorded so future periods can use a true average.</div>
+      <section style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); margin-top:12px">
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Stock on hand (at cost)</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 6,842,118</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">9,204 units across 3,182 SKUs</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Stock turn (proxy)</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">1.4×</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">ZAR 9.4m COGS over 12 months</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Weeks of cover</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">37.8</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">At the trailing sales rate</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Aged stock (no sales in 12m)</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 1,284,600</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">412 SKUs of capital tied up</div>
+        </div>
+      </section>
+      <div style="overflow-x:auto; margin-top:12px">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Units held</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Stock at cost (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">12m COGS (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Turn</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Weeks cover</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ stockRows }}" as="r" hint-placeholder-count="7">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left">{{ r.cat }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.qoh }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.value }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.cogs }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.turn }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.cover }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="color:#898781; font-size:12px; margin-top:14px">Bike stock cover by model and size</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Model / size</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Units held</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Stock at cost (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">12m units sold</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Weeks cover</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ coverRows }}" as="r" hint-placeholder-count="10">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left">{{ r.label }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.qoh }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.value }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.sold }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.cover }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="color:#898781; font-size:12px; margin-top:14px">Aged stock — held but nothing sold in the 12 months to 2026-09-10 (top 25 by capital tied up)</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Product</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Units held</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Stock at cost (ZAR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ deadRows }}" as="r" hint-placeholder-count="8">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.product }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right">{{ r.category }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.qoh }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.value }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="color:#898781; font-size:12px">18 SKUs show NEGATIVE stock on hand — sales recorded against stock that was never received. Those are excluded from the values above, but they mean the stock figures understate reality and the counts need correcting in Lightspeed.</div>
+      </div>
+    </section>
+
+    <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+      <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+        <h2 style="font-size:14px; font-weight:600; margin:0">Discount leakage</h2>
+      </header>
+      <div style="color:#898781; font-size:12px">Line and transaction discounts, measured against gross (list) revenue.</div>
+      <section style="display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); margin-top:12px">
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Discount given</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">ZAR 2,418,904</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Share of gross</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">5.9%</div>
+        </div>
+        <div style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px">
+          <div style="color:#52514e; font-size:12px; margin-bottom:6px">Lines discounted</div>
+          <div style="font-weight:600; letter-spacing:-0.02em; font-size:25px; line-height:1.15">14.8%</div>
+          <div style="color:#898781; font-size:12px; margin-top:5px">6,214 of 41,880</div>
+        </div>
+      </section>
+      <div style="overflow-x:auto; margin-top:12px">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Category</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Discount (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Share of gross</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Net revenue (ZAR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ discCatRows }}" as="r" hint-placeholder-count="7">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left">{{ r.cat }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.disc }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.share }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.net }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="color:#898781; font-size:12px; margin-top:14px">By bike model</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Model</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Discount (ZAR)</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Share of gross</th>
+              <th style="text-align:right; font-weight:600; color:#52514e; font-size:12px; padding:7px 10px; border-bottom:1px solid #e1e0d9; white-space:nowrap">Net revenue (ZAR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ discModelRows }}" as="r" hint-placeholder-count="6">
+              <tr>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:left">{{ r.cat }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.disc }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.share }}</td>
+                <td style="padding:7px 10px; border-bottom:1px solid #e1e0d9; text-align:right; font-variant-numeric:tabular-nums">{{ r.net }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section style="background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:12px; padding:16px 18px; margin-top:16px">
+    <header style="display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; justify-content:space-between; margin-bottom:4px">
+      <h2 style="font-size:14px; font-weight:600; margin:0">Revenue &amp; gross profit by month</h2>
+      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap">
+        <span style="display:inline-flex; gap:6px; align-items:center; color:#52514e; font-size:12px"><span style="width:11px; height:11px; border-radius:3px; flex:none; background:#8c1f34"></span><span>Revenue</span></span>
+        <span style="display:inline-flex; gap:6px; align-items:center; color:#52514e; font-size:12px"><span style="width:11px; height:11px; border-radius:3px; flex:none; background:#2e2c28"></span><span>Gross profit</span></span>
+      </div>
+    </header>
+    <div style="color:#898781; font-size:12px">ZAR, excluding VAT and net of discounts. This chart has its own period, independent of the filter at the top of the page.</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:11px 14px; margin:12px 0 4px; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:10px">
+      <div style="display:flex; gap:2px; background:#eeeeea; border-radius:8px; padding:2px">
+        <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">MTD</button>
+        <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">30d</button>
+        <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">90d</button>
+        <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">YTD</button>
+        <button style="border:none; background:#fcfcfb; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#0b0b0b; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); cursor:pointer">12m</button>
+        <button style="border:none; background:none; border-radius:6px; padding:5px 10px; font:inherit; font-size:13px; color:#52514e; cursor:pointer">All time</button>
+      </div>
+      <label style="color:#52514e; font-size:12px; display:inline-flex; gap:6px; align-items:center">From <input type="date" style="font:inherit; color:#0b0b0b; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px"></label>
+      <label style="color:#52514e; font-size:12px; display:inline-flex; gap:6px; align-items:center">To <input type="date" style="font:inherit; color:#0b0b0b; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px"></label>
+      <button style="font:inherit; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10); border-radius:7px; padding:6px 11px; color:#0b0b0b; cursor:pointer">Apply</button>
+      <div style="flex:1 1 auto"></div>
+      <div style="font-size:12px; color:#52514e">2025-10-01 to 2026-09-10</div>
+    </div>
+    <div style="position:relative; margin-top:8px">
+      <svg viewBox="0 0 1000 300" role="img" aria-label="Revenue and gross profit by month" style="display:block; width:100%; height:auto">
+        <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5">
+          <line x1="66" x2="938" y1="{{ g.y }}" y2="{{ g.y }}" stroke="#e1e0d9" stroke-width="1"></line>
+        </sc-for>
+        <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5">
+          <text x="56" y="{{ g.ty }}" text-anchor="end" fill="#898781" font-size="11" style="font-variant-numeric:tabular-nums">{{ g.label }}</text>
+        </sc-for>
+        <line x1="66" x2="938" y1="266" y2="266" stroke="#c3c2b7" stroke-width="1"></line>
+        <sc-for list="{{ xLabels }}" as="t" hint-placeholder-count="12">
+          <text x="{{ t.x }}" y="288" text-anchor="middle" fill="#898781" font-size="11">{{ t.label }}</text>
+        </sc-for>
+        <path d="{{ revPath }}" fill="none" stroke="#8c1f34" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+        <path d="{{ gpPath }}" fill="none" stroke="#2e2c28" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+        <circle cx="{{ endX }}" cy="{{ revEndY }}" r="4.5" fill="#8c1f34" stroke="#fcfcfb" stroke-width="2"></circle>
+        <circle cx="{{ endX }}" cy="{{ gpEndY }}" r="4.5" fill="#2e2c28" stroke="#fcfcfb" stroke-width="2"></circle>
+        <text x="{{ labelX }}" y="{{ revLabelY }}" fill="#52514e" font-size="11" style="font-variant-numeric:tabular-nums">{{ revEndLabel }}</text>
+        <text x="{{ labelX }}" y="{{ gpLabelY }}" fill="#52514e" font-size="11" style="font-variant-numeric:tabular-nums">{{ gpEndLabel }}</text>
+      </svg>
+    </div>
+  </section>
+
+  <footer style="margin-top:22px; color:#898781; font-size:12px; line-height:1.6">
+    <div>Revenue is ex-VAT and net of discounts, counting only completed, non-voided sales — the same basis as the Lightspeed sales report.</div>
+    <div>Includes ZAR 1,204,318 of revenue (284 lines, ZAR 402,140 gross profit) from Adjustments.xlsx — sales made outside Lightspeed. Lightspeed alone accounts for ZAR 37,208,587, which is the figure that ties to the Lightspeed report.</div>
+    <div>ZAR 3,358,492 of revenue (8.7%) has no unit cost on record in Lightspeed — labour and service lines legitimately carry no COGS, which is why Service Centre, Paarl Trails and Retul show margins near 100%. Blended margin is flattered by this; judge product margin on the goods categories.</div>
+    <div>Includes 612 return/refund lines totalling ZAR −418,204, netted against revenue (the same basis as the Lightspeed report).</div>
+    <div>Line-level and sale-level revenue agree to within ZAR 0.</div>
+    <div>Data last synced 10/09/2026, 06:14:22 · 14,286 sales, 41,880 lines, 12,904 items.</div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const nf0 = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
+    const nf1 = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const money = v => nf0.format(Math.round(v || 0));
+    const pct = v => v == null ? '—' : nf1.format(v) + '%';
+    const compact = v => { const a = Math.abs(v || 0); if (a >= 1e6) return nf1.format(v / 1e6) + 'm'; if (a >= 1e3) return nf0.format(v / 1e3) + 'k'; return nf0.format(v || 0); };
+
+    const CATS = [
+      ['BIKE', 17842110, 21.0, 1142], ['EQUIPMENT', 7214880, 32.0, 12410],
+      ['SERVICE PARTS', 5930415, 30.0, 15204], ['SERVICE CENTRE', 3118204, 98.0, 6982],
+      ['TURBO', 2460330, 21.0, 118], ['APPAREL', 1204560, 35.0, 2318],
+      ['NUTRITION', 402118, 33.0, 5842], ['PAARL TRAILS', 168404, 100.0, 3204],
+      ['RETUL', 71884, 100.0, 214]
+    ];
+    const MODELS = [
+      ['STUMPJUMPER 15', 3142600, 21.4], ['EPIC 8', 2684900, 22.8], ['LEVO', 2318450, 19.6],
+      ['ROCKHOPPER', 1742300, 26.4], ['LEVO SL', 1486220, 20.1], ['TARMAC SL8', 1204880, 18.9],
+      ['CHISEL', 872410, 24.2], ['DIVERGE', 706240, 22.6], ['TURBO VADO', 482980, 19.4],
+      ['CRUX', 339240, 20.8]
+    ];
+    const bars = (rows, max) => rows.map(r => ({
+      cat: r[0], w: Math.max(0, (r[1] / max) * 100) + '%', val: money(r[1]), pct: pct(r[2])
+    }));
+
+    const TOP = [
+      ['STUMPJUMPER 15 S-WORKS CARB/GLDGHST S3', 'BIKE', 6, 1042800, 208560],
+      ['LEVO S-WORKS CARBON BLK/SIL S4', 'BIKE', 4, 928400, 167112],
+      ['EPIC 8 S-WORKS CARB/BLUPRL L', 'BIKE', 5, 874200, 183582],
+      ['TARMAC SL8 S-WORKS RED/BLK 56', 'BIKE', 4, 742600, 133668],
+      ['LEVO SL EXPERT CARBON SAGE S3', 'BIKE', 6, 684900, 143829],
+      ['SERVICE — FULL SUSPENSION SERVICE', 'SERVICE CENTRE', 418, 502400, 492352],
+      ['ROCKHOPPER COMP 29 SATIN BLK M', 'BIKE', 24, 468200, 126414],
+      ['S-WORKS PREVAIL 3 HELMET', 'EQUIPMENT', 86, 412800, 132096],
+      ['ROVAL RAPIDE CLX II WHEELSET', 'SERVICE PARTS', 21, 396400, 107028],
+      ['TURBO VADO 5.0 IGH BLK L', 'TURBO', 7, 384900, 74670]
+    ];
+
+    const monthly = [
+      ['Oct 25', 1142300, 358400], ['Nov 25', 1284600, 402100], ['Dec 25', 1468200, 471300],
+      ['Jan 26', 1082400, 338700], ['Feb 26', 1318900, 421600], ['Mar 26', 1542700, 498200],
+      ['Apr 26', 1208300, 372400], ['May 26', 1064800, 328900], ['Jun 26', 986400, 302100],
+      ['Jul 26', 1142900, 356800], ['Aug 26', 1386500, 442300], ['Sep 26', 612400, 196800]
+    ];
+    const W = 1000, H = 300, m = { t: 16, r: 62, b: 34, l: 66 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const ticks = [0, 400000, 800000, 1200000, 1600000];
+    const yMax = 1600000;
+    const X = i => m.l + (i / (monthly.length - 1)) * iw;
+    const Y = v => m.t + ih - (v / yMax) * ih;
+    const mono = (xs, ys) => {
+      const n = xs.length, d = new Array(n - 1);
+      for (let i = 0; i < n - 1; i++) d[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
+      const mm = new Array(n); mm[0] = d[0]; mm[n - 1] = d[n - 2];
+      for (let i = 1; i < n - 1; i++) mm[i] = (d[i - 1] * d[i] <= 0) ? 0 : (d[i - 1] + d[i]) / 2;
+      for (let i = 0; i < n - 1; i++) {
+        if (d[i] === 0) { mm[i] = 0; mm[i + 1] = 0; continue; }
+        const a = mm[i] / d[i], b = mm[i + 1] / d[i], s = a * a + b * b;
+        if (s > 9) { const t = 3 / Math.sqrt(s); mm[i] = t * a * d[i]; mm[i + 1] = t * b * d[i]; }
+      }
+      let p = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+      for (let i = 0; i < n - 1; i++) {
+        const dx = (xs[i + 1] - xs[i]) / 3;
+        p += ` C${(xs[i] + dx).toFixed(1)},${(ys[i] + mm[i] * dx).toFixed(1)} ${(xs[i + 1] - dx).toFixed(1)},${(ys[i + 1] - mm[i + 1] * dx).toFixed(1)} ${xs[i + 1].toFixed(1)},${ys[i + 1].toFixed(1)}`;
+      }
+      return p;
+    };
+    const xs = monthly.map((_, i) => X(i));
+    const li = monthly.length - 1;
+    let revEndY = Y(monthly[li][1]), gpEndY = Y(monthly[li][2]);
+    let revLabelY = revEndY + 4, gpLabelY = gpEndY + 4;
+    if (Math.abs(revEndY - gpEndY) < 12) { const mid = (revEndY + gpEndY) / 2; revLabelY = mid - 3; gpLabelY = mid + 11; }
+
+    return {
+      budgetRows: [
+        ['BIKE', 15770000, 17842110], ['EQUIPMENT', 8360000, 7214880],
+        ['SERVICE PARTS', 6460000, 5930415], ['SERVICE CENTRE', 3420000, 3118204],
+        ['TURBO', 2300000, 2460330], ['APPAREL', 1520000, 1204560], ['NUTRITION', 380000, 402118]
+      ].map(r => {
+        const v = r[2] - r[1];
+        return { cat: r[0], budget: money(r[1]), actual: money(r[2]),
+          variance: (v >= 0 ? '+' : '−') + money(Math.abs(v)),
+          pct: (v >= 0 ? '+' : '') + nf1.format(v / r[1] * 100) + '%' };
+      }),
+      catRows: bars(CATS, Math.max(...CATS.map(r => r[1]))),
+      modelRows: bars(MODELS, Math.max(...MODELS.map(r => r[1]))),
+      topRows: TOP.map((r, i) => ({ rank: String(i + 1), product: r[0], category: r[1],
+        units: nf0.format(r[2]), revenue: money(r[3]), gp: money(r[4]), margin: pct(r[4] / r[3] * 100) })),
+      attachRows: [
+        ['EQUIPMENT', 1842, 1142300, 365536], ['SERVICE PARTS', 1204, 486200, 145860],
+        ['APPAREL', 684, 312400, 109340], ['NUTRITION', 502, 148600, 49038],
+        ['SERVICE CENTRE', 86, 95400, 93492]
+      ].map(r => ({ cat: r[0], units: nf0.format(r[1]), revenue: money(r[2]), gp: money(r[3]), margin: pct(r[3] / r[2] * 100) })),
+      stockRows: [
+        ['BIKE', 214, 3418200, 4284600], ['EQUIPMENT', 2840, 1204800, 2148900],
+        ['SERVICE PARTS', 4918, 1486200, 2318400], ['TURBO', 38, 486400, 402800],
+        ['APPAREL', 908, 184200, 218600], ['NUTRITION', 286, 62318, 44000]
+      ].map(r => { const t = r[3] / r[2]; return { cat: r[0], qoh: nf0.format(r[1]), value: money(r[2]), cogs: money(r[3]), turn: nf1.format(t) + '×', cover: nf1.format(52 / t) }; }),
+      coverRows: [
+        ['STUMPJUMPER 15 / S3', 6, 486200, 18], ['STUMPJUMPER 15 / S4', 4, 324100, 22],
+        ['EPIC 8 / M', 5, 402800, 14], ['EPIC 8 / L', 3, 241600, 16],
+        ['LEVO / S4', 4, 384900, 11], ['LEVO SL / S3', 3, 268400, 8],
+        ['ROCKHOPPER / M', 18, 186200, 64], ['ROCKHOPPER / S', 12, 124100, 38],
+        ['TARMAC SL8 / 56', 2, 198400, 7], ['CRUX / 54', 3, 162800, 0]
+      ].map(r => ({ label: r[0], qoh: nf0.format(r[1]), value: money(r[2]), sold: nf0.format(r[3]),
+        cover: r[3] > 0 ? nf1.format(r[1] * 52 / r[3]) : 'no sales in 12m' })),
+      deadRows: [
+        ['CAMBER COMP CARBON 29 BLK/RED L', 'BIKE', 2, 98400],
+        ['SHIV DISC MODULE 56', 'BIKE', 1, 74200],
+        ['ROVAL CONTROL SL 29 WHEELSET', 'SERVICE PARTS', 2, 68400],
+        ['S-WORKS EXOS ROAD SHOE 44', 'EQUIPMENT', 4, 42800],
+        ['FATBOY COMP CARBON M', 'BIKE', 1, 38600],
+        ['DEMO RACE FRAMESET S3', 'BIKE', 1, 34200],
+        ['SIRRUS X 4.0 SATIN BLK XL', 'BIKE', 2, 31800],
+        ['BODY GEOMETRY POWER EXPERT SADDLE 168', 'EQUIPMENT', 9, 24600]
+      ].map(r => ({ product: r[0], category: r[1], qoh: nf0.format(r[2]), value: money(r[3]) })),
+      discCatRows: [
+        ['BIKE', 1486200, 17842110], ['EQUIPMENT', 402800, 7214880],
+        ['SERVICE PARTS', 284600, 5930415], ['TURBO', 148900, 2460330],
+        ['APPAREL', 62400, 1204560], ['SERVICE CENTRE', 28400, 3118204],
+        ['NUTRITION', 5604, 402118]
+      ].map(r => ({ cat: r[0], disc: money(r[1]), share: pct(r[1] / (r[1] + r[2]) * 100), net: money(r[2]) })),
+      discModelRows: [
+        ['STUMPJUMPER 15', 284600, 3142600], ['EPIC 8', 241800, 2684900],
+        ['LEVO', 218400, 2318450], ['LEVO SL', 162400, 1486220],
+        ['TARMAC SL8', 148200, 1204880], ['ROCKHOPPER', 86400, 1742300]
+      ].map(r => ({ cat: r[0], disc: money(r[1]), share: pct(r[1] / (r[1] + r[2]) * 100), net: money(r[2]) })),
+      gridLines: ticks.map(t => ({ y: Y(t), ty: Y(t) + 4, label: compact(t) })),
+      xLabels: monthly.map((d, i) => ({ x: X(i), label: d[0] })),
+      revPath: mono(xs, monthly.map(d => Y(d[1]))),
+      gpPath: mono(xs, monthly.map(d => Y(d[2]))),
+      endX: X(li), labelX: X(li) + 9,
+      revEndY, gpEndY, revLabelY, gpLabelY,
+      revEndLabel: compact(monthly[li][1]), gpEndLabel: compact(monthly[li][2])
+    };
+  }
+}
+</script>
+</body>
+</html>

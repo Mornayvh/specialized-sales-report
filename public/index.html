@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sales Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /*
+   * Design language ported from design/Sales Dashboard (print).dc.html:
+   * navy as the primary accent, maroon/clay reserved EXCLUSIVELY for
+   * negative or unfavourable values (budget shortfall, discount given away,
+   * aged stock capital) — never used as a generic brand or series colour.
+   * Zero border-radius throughout (deliberately sharp, blueprint/ledger
+   * aesthetic); hairline dividers; Barlow / Barlow Condensed type; small
+   * corner tick marks on frames (see .card::before/::after below).
+   */
+  :root {
+    color-scheme: light only;
+    --page:            #f2f2f3;
+    --surface-1:       #f2f2f3;   /* frames sit flush on the page, divider-only separation */
+    --text-primary:    #1d1f20;
+    --text-secondary:  #5d5d60;
+    --text-muted:      #7a7a7d;
+    --grid:            rgba(29, 31, 32, 0.14);
+    --axis:            #b7b7ba;
+    --border:          rgba(29, 31, 32, 0.16);
+    --series-1:        #416180;   /* navy accent-700 — the one series colour for bars */
+    --series-2:        #7e9cb8;   /* navy accent-2-500 — second trend line, same family */
+    --negative:        #8c1f34;   /* clay — negative/unfavourable values ONLY, never decorative */
+    --band-bg:          #1d2d3d;   /* header band */
+    --band-text:        #f5f5f8;
+    --band-kicker:      #b5d9fd;
+    --trend-revenue:   #1d2d3d;   /* deep navy — primary series */
+    --trend-gp:        #7e9cb8;   /* lighter navy-2 — secondary series */
+    --track:           #e7e7ea;
+    --good:            #2f6f4f;
+    --hover-wash:      rgba(29, 31, 32, 0.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 0 40px;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: "Barlow", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  h1, h2, h3, .heading-font { font-family: "Barlow Condensed", system-ui, sans-serif; }
+
+  /* ---------- header band ---------- */
+  .masthead {
+    background: var(--band-bg); color: var(--band-text);
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; justify-content: space-between;
+    padding: 16px 28px 17px; margin-bottom: 14px;
+  }
+  .kick { font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--band-kicker); }
+  h1 { font-size: 27px; font-weight: 600; line-height: 1.05; margin: 3px 0 2px; letter-spacing: -0.02em; color: #fff; }
+  .sub { color: var(--band-kicker); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .masthead-actions { display: flex; gap: 8px; align-items: center; }
+
+  button, select, input[type="date"] {
+    font: inherit; color: var(--text-primary);
+    background: var(--page);
+    border: 1px solid var(--border); border-radius: 0;
+    padding: 6px 11px; cursor: pointer;
+  }
+  button:hover, select:hover { background: var(--hover-wash); }
+  button.primary {
+    background: #94bce3; border-color: transparent; color: var(--band-bg); font-weight: 600;
+    font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.04em; text-transform: uppercase; font-size: 12px;
+  }
+  button.primary:hover { filter: brightness(1.05); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .linkish { background: none; border: none; padding: 2px 4px; color: var(--text-secondary); font-size: 12px; text-decoration: underline; }
+
+  /* ---------- page shell: collapsible left filter sidebar + main content ---------- */
+  .shell { display: flex; gap: 14px; align-items: flex-start; padding: 0 28px; }
+  .sidebar { width: 210px; flex: none; border: 1px solid var(--border); background: var(--surface-1); }
+  .sidebar-head { display: flex; align-items: baseline; justify-content: space-between; padding: 8px 11px 7px; border-bottom: 1px solid var(--border); }
+  .sidebar-head h3 { font-size: 14px; margin: 0; }
+  .sidebar-body { padding: 10px 11px 12px; }
+  .sidebar-collapsed { width: 32px; flex: none; border: 1px solid var(--border); background: var(--surface-1); padding: 9px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+  .sidebar-collapsed[hidden] { display: none; }   /* [hidden] loses to any author display rule otherwise */
+  .sidebar-collapsed span.arrow { font-family: "Barlow Condensed", sans-serif; font-size: 13px; color: var(--series-1); }
+  .sidebar-collapsed span.label { writing-mode: vertical-rl; font-family: "Barlow Condensed", sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-secondary); }
+  .k-label { font-size: 9.5px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--series-1); margin-bottom: 4px; }
+
+  /* Horizontal segmented toggle (model kind, trend period) — inline within a
+     card, distinct from the sidebar's vertical .seg-v period-preset list. */
+  .seg { display: flex; border: 1px solid var(--border); }
+  .seg button {
+    border: none; background: transparent; padding: 5px 10px;
+    font-family: "Barlow Condensed", sans-serif; font-size: 12px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-secondary);
+    border-right: 1px solid var(--border);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button[aria-pressed="true"] { background: var(--series-1); color: #fff; }
+
+  /* Standalone inline filter row (used by the trend chart's own period control). */
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 10px; border: 1px solid var(--border); background: var(--surface-1);
+  }
+  .filters label { color: var(--text-secondary); font-size: 11.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .filters .spacer { flex: 1 1 auto; }
+  .seg-v { border: 1px solid var(--border); margin-bottom: 10px; }
+  .seg-v button {
+    display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--border);
+    background: transparent; padding: 6px 9px; font-family: "Barlow Condensed", sans-serif;
+    font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary);
+  }
+  .seg-v button:last-child { border-bottom: none; }
+  .seg-v button[aria-pressed="true"] { background: var(--series-1); color: #fff; }
+  .sidebar label.field { display: block; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); margin-top: 8px; }
+  .sidebar label.field input { display: block; width: 100%; margin-top: 3px; }
+  .sidebar button#apply { width: 100%; margin-top: 9px; background: var(--series-1); color: #fff; font-weight: 600; }
+  .sidebar .showing-block { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 9px; }
+  #status { font-size: 12px; color: var(--text-secondary); min-height: 1em; }
+  .main-col { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ---------- layout ---------- */
+  .grid { display: grid; gap: 11px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 0; }
+  .cards { grid-template-columns: 1fr; }
+
+  /*
+   * .card carries the "blueprint" corner ticks — a small L-shaped mark at
+   * top-left and bottom-right, evoking the source design's 4-corner frame
+   * marks via pure CSS (no extra markup needed on JS-generated cards).
+   */
+  .card {
+    position: relative;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 0; padding: 14px 16px;
+  }
+  .card::before, .card::after {
+    content: ''; position: absolute; width: 11px; height: 11px; pointer-events: none;
+    border-color: var(--series-1); opacity: 0.55;
+  }
+  .card::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
+  .card::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
+  .card > header { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+  .card .note { color: var(--text-muted); font-size: 10.5px; }
+
+  /* ---------- stat tiles ---------- */
+  .tile .label { font-size: 9.5px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--series-1); margin-bottom: 5px; }
+  .tile .value { font-family: "Barlow Condensed", sans-serif; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .tile .value.hero { font-size: 28px; line-height: 1.1; }
+  .tile .value.std  { font-size: 21px; line-height: 1.15; }
+  .tile .foot { color: var(--text-muted); font-size: 11px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- horizontal bars (category / model) ---------- */
+  .bars { display: flex; flex-direction: column; gap: 1.5px; margin-top: 8px; }
+  .bar-row {
+    display: grid; grid-template-columns: minmax(96px, 148px) 1fr minmax(96px, auto) 62px;
+    gap: 10px; align-items: center; padding: 2.5px 4px; cursor: default;
+  }
+  .bar-row:hover, .bar-row:focus-visible { background: var(--hover-wash); outline: none; }
+  .bar-row .cat { color: var(--text-secondary); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { background: var(--track); border-radius: 0; height: 9px; overflow: hidden; }
+  .bar-fill { height: 9px; background: var(--series-1); border-radius: 0; }
+  .bar-row .val, .bar-row .pct { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .bar-row .pct { color: var(--text-secondary); }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    text-align: right; font-family: "Barlow Condensed", sans-serif; font-weight: 600;
+    color: var(--text-secondary); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 5px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap;
+  }
+  thead th:first-child, tbody td:first-child { text-align: left; }
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { color: var(--text-primary); }
+  tbody td { padding: 4px 8px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--hover-wash); }
+  td.name { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: normal; }
+  td.rank { color: var(--text-muted); width: 26px; text-align: right !important; font-family: "Barlow Condensed", sans-serif; }
+  .scroll-x { overflow-x: auto; }
+  tfoot .total-row td { padding: 6px 8px; border-top: 1px solid var(--axis); border-bottom: none; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  tfoot .total-row td.name { font-variant-numeric: normal; font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.05em; text-transform: uppercase; }
+  .bar-row.total { margin-top: 3px; padding-top: 5px; border-top: 1px solid var(--axis); font-weight: 700; }
+  .bar-row.total .cat { color: var(--text-primary); font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* ---------- chart ---------- */
+  .chart-wrap { position: relative; margin-top: 8px; }
+  svg { display: block; width: 100%; height: auto; }
+  .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .legend .key { display: inline-flex; gap: 6px; align-items: center; color: var(--text-secondary); font-size: 12px; }
+  .legend .swatch { width: 11px; height: 11px; border-radius: 0; flex: none; }
+
+  .tooltip {
+    position: fixed; z-index: 20; pointer-events: none; opacity: 0;
+    background: var(--page); color: var(--text-primary);
+    border: 1px solid var(--text-primary); border-radius: 0;
+    padding: 8px 10px; font-size: 12px; min-width: 130px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.14); transition: opacity .1s;
+  }
+  .tooltip .tt-title { font-weight: 600; margin-bottom: 4px; font-family: "Barlow Condensed", sans-serif; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 14px; }
+  .tooltip .tt-row span:last-child { font-variant-numeric: tabular-nums; }
+
+  .crumbs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0 2px; font-size: 13px; }
+  .crumbs button {
+    background: none; border: none; padding: 2px 4px; color: var(--series-1);
+    text-decoration: underline; font-size: 13px;
+  }
+  .crumbs .sep { color: var(--text-muted); }
+  .crumbs .current { color: var(--text-primary); font-weight: 600; }
+  .bar-row.drillable { cursor: pointer; }
+  .bar-row.drillable .cat::after { content: ' ›'; color: var(--text-muted); }
+
+  .refetching { opacity: 0.45; }   /* hold previous render, no skeleton flash */
+  .banner {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 15px; margin-bottom: 12px; border-radius: 0;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-left: 3px solid var(--negative); font-size: 13px;
+  }
+  .banner strong { display: block; margin-bottom: 2px; font-family: "Barlow Condensed", sans-serif; }
+  .banner .b-body { color: var(--text-secondary); }
+  .empty { color: var(--text-muted); padding: 22px 4px; text-align: center; }
+  footer.notes { margin-top: 18px; color: var(--text-muted); font-size: 11.5px; line-height: 1.6; }
+  footer.notes code { font-size: 11px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div>
+    <div class="kick">Specialized Paarl · Lightspeed Retail</div>
+    <h1>Sales Dashboard</h1>
+    <div class="sub" id="subtitle">Loading…</div>
+  </div>
+  <div class="masthead-actions">
+    <button id="resync" class="primary">Re-sync</button>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <h3>Filters</h3>
+      <button class="linkish" id="sidebar-hide" style="text-decoration:underline">Hide ›</button>
+    </div>
+    <div class="sidebar-body">
+      <div class="k-label">Period preset</div>
+      <div class="seg-v" id="presets" role="group" aria-label="Period preset"></div>
+      <label class="field">From <input type="date" id="from" /></label>
+      <label class="field">To <input type="date" id="to" /></label>
+      <button id="apply">Apply range</button>
+      <div class="showing-block">
+        <div class="k-label">Showing</div>
+        <div id="status" role="status" aria-live="polite" style="font-family:'Barlow Condensed',sans-serif; font-size:14px; color:var(--text-primary)"></div>
+      </div>
+    </div>
+  </aside>
+  <button class="sidebar-collapsed" id="sidebar-show" hidden>
+    <span class="arrow">›</span>
+    <span class="label">Filters</span>
+  </button>
+
+  <div class="main-col">
+    <div id="banner" hidden></div>
+
+    <main id="content">
+      <section class="grid kpis" id="kpis" aria-label="Key figures"></section>
+
+  <div class="grid cards">
+    <section class="card">
+      <header>
+        <h2>Budget vs actual</h2>
+        <div class="note" id="budget-window"></div>
+      </header>
+      <div class="note" id="budget-note"></div>
+      <section class="grid kpis" id="budget-kpis" style="margin-top:12px"></section>
+      <div class="scroll-x" id="budget-table" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>Sales by category</h2>
+        <button class="linkish" data-toggle="cat">Show table</button>
+      </header>
+      <div class="note">Top-level Lightspeed category · revenue in ZAR, ex-VAT net of discounts</div>
+      <div id="cat-chart"></div>
+      <div id="cat-table" hidden class="scroll-x"></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>Bike sales by model</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <div class="seg" id="model-kind" role="group" aria-label="Item form"></div>
+          <button class="linkish" data-toggle="model">Show table</button>
+        </div>
+      </header>
+      <nav class="crumbs" id="model-crumbs" aria-label="Model drill-down"></nav>
+      <div class="note" id="model-note"></div>
+      <div id="model-chart"></div>
+      <div id="model-table" hidden class="scroll-x"></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>Top 10 products</h2>
+        <div class="note" id="top-note"></div>
+      </header>
+      <div class="scroll-x" id="top-products"></div>
+    </section>
+
+    <section class="card">
+      <header><h2>Accessory attach rate on bike sales</h2></header>
+      <div class="note" id="attach-note"></div>
+      <section class="grid kpis" id="attach-kpis" style="margin-top:12px"></section>
+      <div class="scroll-x" id="attach-table" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>Stock on hand &amp; stock turn</h2>
+        <div class="note" id="stock-window"></div>
+      </header>
+      <div class="note" id="stock-note"></div>
+      <section class="grid kpis" id="stock-kpis" style="margin-top:12px"></section>
+      <div class="scroll-x" id="stock-table" style="margin-top:12px"></div>
+      <div class="note" style="margin-top:14px">Bike stock cover by model and size</div>
+      <div class="scroll-x" id="stock-cover-table"></div>
+      <div class="note" style="margin-top:14px" id="stock-dead-note"></div>
+      <div class="scroll-x" id="stock-dead-table"></div>
+    </section>
+
+    <section class="card">
+      <header><h2>Discount leakage</h2></header>
+      <div class="note" id="discount-note"></div>
+      <section class="grid kpis" id="discount-kpis" style="margin-top:12px"></section>
+      <div class="scroll-x" id="discount-table" style="margin-top:12px"></div>
+      <div class="note" style="margin-top:14px">By bike model</div>
+      <div class="scroll-x" id="discount-model-table"></div>
+    </section>
+  </div>
+
+    <section class="card">
+      <header>
+        <h2>Revenue &amp; gross profit by month</h2>
+        <div class="legend" id="trend-legend"></div>
+      </header>
+      <div class="note">ZAR, excluding VAT and net of discounts. This chart has its own period, independent of the filter at the top of the page.</div>
+      <div class="filters" style="margin:12px 0 4px">
+        <div class="seg" id="trend-presets" role="group" aria-label="Trend period"></div>
+        <label>From <input type="date" id="trend-from" /></label>
+        <label>To <input type="date" id="trend-to" /></label>
+        <button id="trend-apply">Apply</button>
+        <div class="spacer"></div>
+        <div id="trend-status" style="font-size:12px; color:var(--text-secondary)"></div>
+      </div>
+      <div class="chart-wrap" id="trend"></div>
+    </section>
+
+  <footer class="notes" id="notes"></footer>
+    </main>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+<script>
+// ---------------------------------------------------------------- formatting
+const nf0 = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const money = v => nf0.format(Math.round(v || 0));
+const pct = v => (v == null || !isFinite(v)) ? '—' : nf1.format(v) + '%';
+const compact = v => {
+  const a = Math.abs(v || 0);
+  if (a >= 1e9) return nf1.format(v / 1e9) + 'bn';
+  if (a >= 1e6) return nf1.format(v / 1e6) + 'm';
+  if (a >= 1e3) return nf0.format(v / 1e3) + 'k';
+  return nf0.format(v || 0);
+};
+const marginOf = (gp, rev) => rev ? (gp / rev) * 100 : null;
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+// ---------------------------------------------------------------- tooltip
+const tooltip = document.getElementById('tooltip');
+function showTip(evt, title, rows) {
+  tooltip.innerHTML = '';
+  tooltip.appendChild(el('div', 'tt-title', title));
+  for (const [k, v] of rows) {
+    const r = el('div', 'tt-row');
+    r.appendChild(el('span', null, k));
+    r.appendChild(el('span', null, v));
+    tooltip.appendChild(r);
+  }
+  tooltip.style.opacity = '1';
+  tooltip.setAttribute('aria-hidden', 'false');
+  moveTip(evt);
+}
+function moveTip(evt) {
+  const pad = 14, r = tooltip.getBoundingClientRect();
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - pad;
+  tooltip.style.left = Math.max(8, x) + 'px';
+  tooltip.style.top = Math.max(8, y) + 'px';
+}
+function hideTip() { tooltip.style.opacity = '0'; tooltip.setAttribute('aria-hidden', 'true'); }
+
+// ---------------------------------------------------------------- state
+const PRESETS = [
+  { id: 'mtd',  label: 'MTD' },
+  { id: '30d',  label: '30d' },
+  { id: '90d',  label: '90d' },
+  { id: 'ytd',  label: 'YTD' },
+  { id: '12m',  label: '12m' },
+  { id: 'all',  label: 'All time' }
+];
+let activePreset = 'all';
+let meta = null;
+let lastData = null;
+let stockLoaded = false;
+
+const iso = d => d.toISOString().slice(0, 10);
+function rangeForPreset(id) {
+  const today = new Date();
+  const end = iso(today);
+  switch (id) {
+    case 'mtd': return [iso(new Date(today.getFullYear(), today.getMonth(), 1)), end];
+    case '30d': return [iso(new Date(Date.now() - 29 * 864e5)), end];
+    case '90d': return [iso(new Date(Date.now() - 89 * 864e5)), end];
+    case 'ytd': return [iso(new Date(today.getFullYear(), 0, 1)), end];
+    case '12m': return [iso(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())), end];
+    default:    return ['', ''];
+  }
+}
+
+function renderPresets() {
+  const box = document.getElementById('presets');
+  box.innerHTML = '';
+  for (const p of PRESETS) {
+    const b = el('button', null, p.label);
+    b.setAttribute('aria-pressed', String(p.id === activePreset));
+    b.onclick = () => {
+      activePreset = p.id;
+      const [f, t] = rangeForPreset(p.id);
+      document.getElementById('from').value = f;
+      document.getElementById('to').value = t;
+      renderPresets();
+      load();
+    };
+    box.appendChild(b);
+  }
+}
+
+// ---------------------------------------------------------------- stat tiles
+// Relative % change vs the same period last year. null when there is nothing
+// meaningful to divide by (no prior figure at all).
+function splyPctDelta(curr, prior) {
+  if (prior == null) return null;
+  if (prior === 0) return curr === 0 ? 0 : null;   // can't express "from zero" as a %
+  return (curr - prior) / Math.abs(prior) * 100;
+}
+
+// Percentage-POINT change (for the margin tile) — margin is already a percent,
+// so a relative "% change of a %" would read as nonsense; the honest comparison
+// is the plain point difference (e.g. "+4.2pp"), not a relative ratio.
+function splyPointDelta(curr, prior) {
+  return prior == null ? null : curr - prior;
+}
+
+// Builds "ZAR 12,345 same period last year (+8.2%)" as a DOM fragment, with the
+// delta coloured green when it moved in the direction that's good for the
+// business and left in the neutral secondary-text colour otherwise — never red,
+// since a dip here isn't necessarily alarming, just informational.
+function splyFoot(priorText, delta, deltaSuffix) {
+  const wrap = document.createElement('span');
+  wrap.appendChild(document.createTextNode(priorText + ' same period last year'));
+  if (delta != null && isFinite(delta)) {
+    const span = document.createElement('span');
+    const sign = delta > 0 ? '+' : (delta < 0 ? '−' : '±');
+    span.textContent = ` (${sign}${nf1.format(Math.abs(delta))}${deltaSuffix})`;
+    span.style.color = delta >= 0 ? 'var(--good)' : 'var(--text-secondary)';
+    wrap.appendChild(span);
+  }
+  return wrap;
+}
+
+function renderKpis(k) {
+  const revenue = k.revenue || 0;
+  const gp = revenue - (k.cogs || 0);
+  const margin = marginOf(gp, revenue);
+  const avg = k.transactions ? revenue / k.transactions : 0;
+  const box = document.getElementById('kpis');
+  box.innerHTML = '';
+
+  // SPLY is null for an unbounded "All time" view — there is no single prior
+  // year to compare against, so each tile falls back to its plain description.
+  const s = k.sply;
+  const sGp = s ? s.revenue - (s.cogs || 0) : null;
+  const sMargin = s ? marginOf(sGp, s.revenue) : null;
+  const sAvg = s && s.transactions ? s.revenue / s.transactions : null;
+
+  const tiles = [
+    { label: 'Revenue (ex-VAT, net of discount)', value: 'ZAR ' + money(revenue), hero: true,
+      footNode: s ? splyFoot('ZAR ' + money(s.revenue), splyPctDelta(revenue, s.revenue), '%') : null,
+      foot: nf0.format(k.transactions || 0) + ' transactions' },
+    { label: 'Gross profit', value: 'ZAR ' + money(gp),
+      footNode: s ? splyFoot('ZAR ' + money(sGp), splyPctDelta(gp, sGp), '%') : null,
+      foot: 'Revenue less cost of goods sold' },
+    { label: 'Gross margin', value: pct(margin),
+      footNode: s ? splyFoot(pct(sMargin), splyPointDelta(margin, sMargin), 'pp') : null,
+      foot: 'ZAR ' + compact(k.cogs || 0) + ' COGS' },
+    { label: 'Average sale value', value: 'ZAR ' + money(avg),
+      footNode: s ? splyFoot('ZAR ' + money(sAvg || 0), splyPctDelta(avg, sAvg), '%') : null,
+      foot: nf0.format(k.units || 0) + ' units sold' }
+  ];
+
+  for (const t of tiles) {
+    const c = el('div', 'card tile');
+    c.appendChild(el('div', 'label', t.label));
+    c.appendChild(el('div', 'value ' + (t.hero ? 'hero' : 'std'), t.value));
+    const footDiv = el('div', 'foot');
+    if (t.footNode) footDiv.appendChild(t.footNode); else footDiv.textContent = t.foot;
+    c.appendChild(footDiv);
+    box.appendChild(c);
+  }
+}
+
+// ---------------------------------------------------------------- trend (2-series line, one axis)
+function renderTrend(monthly) {
+  const host = document.getElementById('trend');
+  const legend = document.getElementById('trend-legend');
+  legend.innerHTML = '';
+  for (const [name, varName] of [['Revenue', '--trend-revenue'], ['Gross profit', '--trend-gp']]) {
+    const key = el('span', 'key');
+    const sw = el('span', 'swatch');
+    sw.style.background = `var(${varName})`;
+    key.appendChild(sw);
+    key.appendChild(el('span', null, name));
+    legend.appendChild(key);
+  }
+
+  host.innerHTML = '';
+  if (!monthly.length) { host.appendChild(el('div', 'empty', 'No sales in this period.')); return; }
+
+  const W = 1000, H = 300, m = { t: 16, r: 62, b: 34, l: 66 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxV = Math.max(...monthly.map(d => Math.max(d.revenue, d.gross_profit)), 1);
+  const ticks = niceTicks(0, maxV, 4);
+  const yMax = ticks[ticks.length - 1];
+  const X = i => monthly.length === 1 ? m.l + iw / 2 : m.l + (i / (monthly.length - 1)) * iw;
+  const Y = v => m.t + ih - (v / yMax) * ih;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `Revenue and gross profit by month, ${monthly[0].month} to ${monthly[monthly.length - 1].month}`);
+  const add = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); svg.appendChild(n); return n; };
+
+  // hairline grid + y ticks
+  for (const t of ticks) {
+    add('line', { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), stroke: 'var(--grid)', 'stroke-width': 1 });
+    const lb = add('text', { x: m.l - 10, y: Y(t) + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 11 });
+    lb.style.fontVariantNumeric = 'tabular-nums';
+    lb.textContent = compact(t);
+  }
+  add('line', { x1: m.l, x2: m.l + iw, y1: Y(0), y2: Y(0), stroke: 'var(--axis)', 'stroke-width': 1 });
+
+  // x labels — thinned so they never collide. The final month is only labelled
+  // when it sits far enough past the last thinned tick, otherwise the two
+  // overlap into an unreadable smudge at the right edge.
+  const step = Math.max(1, Math.ceil(monthly.length / 12));
+  const last = monthly.length - 1;
+  const labelLast = last % step >= step / 2;
+  monthly.forEach((d, i) => {
+    const onTick = i % step === 0;
+    if (!onTick && !(i === last && labelLast)) return;
+    if (onTick && i === last && !labelLast) return;
+    const lb = add('text', { x: X(i), y: H - 12, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 11 });
+    lb.textContent = d.month;
+  });
+
+  const series = [
+    { key: 'revenue', color: 'var(--trend-revenue)', name: 'Revenue' },
+    { key: 'gross_profit', color: 'var(--trend-gp)', name: 'Gross profit' }
+  ];
+  // End labels are nudged apart only when they would overlap, so they stay
+  // attached to their own line instead of being stacked unconditionally.
+  const li = monthly.length - 1;
+  const endYs = series.map(s => Y(monthly[li][s.key]));
+  if (Math.abs(endYs[0] - endYs[1]) < 12) {
+    const mid = (endYs[0] + endYs[1]) / 2;
+    endYs[0] = mid - 7; endYs[1] = mid + 7;
+  }
+  series.forEach((s, si) => {
+    const xs = monthly.map((d, i) => X(i));
+    const ys = monthly.map(d => Y(d[s.key]));
+    const dAttr = monotonePath(xs, ys);
+    add('path', { d: dAttr, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+    add('circle', { cx: X(li), cy: Y(monthly[li][s.key]), r: 4.5, fill: s.color, stroke: 'var(--surface-1)', 'stroke-width': 2 });
+    // selective direct label: the endpoint only
+    const lb = add('text', { x: X(li) + 9, y: endYs[si] + 4, fill: 'var(--text-secondary)', 'font-size': 11 });
+    lb.style.fontVariantNumeric = 'tabular-nums';
+    lb.textContent = compact(monthly[li][s.key]);
+  });
+
+  // crosshair + nearest-x hover across the whole plot
+  const cross = add('line', { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0 });
+  const dots = series.map(s => add('circle', { r: 4.5, fill: s.color, stroke: 'var(--surface-1)', 'stroke-width': 2, opacity: 0 }));
+  const hit = add('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', style: 'cursor:crosshair' });
+  hit.addEventListener('mousemove', evt => {
+    const box = svg.getBoundingClientRect();
+    const px = (evt.clientX - box.left) / box.width * W;
+    let i = 0, best = Infinity;
+    monthly.forEach((_, j) => { const dd = Math.abs(X(j) - px); if (dd < best) { best = dd; i = j; } });
+    const d = monthly[i];
+    cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('opacity', 1);
+    dots.forEach((dot, k) => {
+      dot.setAttribute('cx', X(i)); dot.setAttribute('cy', Y(d[series[k].key])); dot.setAttribute('opacity', 1);
+    });
+    showTip(evt, d.month, [
+      ['Revenue', 'ZAR ' + money(d.revenue)],
+      ['Gross profit', 'ZAR ' + money(d.gross_profit)],
+      ['Margin', pct(marginOf(d.gross_profit, d.revenue))]
+    ]);
+  });
+  hit.addEventListener('mouseleave', () => {
+    cross.setAttribute('opacity', 0);
+    dots.forEach(d => d.setAttribute('opacity', 0));
+    hideTip();
+  });
+
+  host.appendChild(svg);
+}
+
+/*
+ * Monotone cubic Hermite spline (Fritsch-Carlson) through (xs[i], ys[i]).
+ * Passes EXACTLY through every real data point — smoothing only softens the
+ * curve BETWEEN points, it never moves or approximates the values themselves.
+ * Chosen over a plain Catmull-Rom spline specifically because Catmull-Rom can
+ * overshoot past a neighbouring point and draw a peak or dip the data doesn't
+ * contain; this construction is constrained to never exceed the range of its
+ * two neighbouring values, so the visual can't imply a month did better or
+ * worse than it actually did.
+ */
+function monotonePath(xs, ys) {
+  const n = xs.length;
+  if (n === 0) return '';
+  if (n === 1) return `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+  if (n === 2) return `M${xs[0].toFixed(1)},${ys[0].toFixed(1)} L${xs[1].toFixed(1)},${ys[1].toFixed(1)}`;
+
+  const d = new Array(n - 1);
+  for (let i = 0; i < n - 1; i++) d[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
+  const m = new Array(n);
+  m[0] = d[0];
+  m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = (d[i - 1] * d[i] <= 0) ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i];
+    const s = a * a + b * b;
+    if (s > 9) { const t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+
+  let path = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = (xs[i + 1] - xs[i]) / 3;
+    const c1x = xs[i] + dx, c1y = ys[i] + m[i] * dx;
+    const c2x = xs[i + 1] - dx, c2y = ys[i + 1] - m[i + 1] * dx;
+    path += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${xs[i + 1].toFixed(1)},${ys[i + 1].toFixed(1)}`;
+  }
+  return path;
+}
+
+function niceTicks(min, max, count) {
+  const raw = (max - min) / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const stepN = norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1;
+  const step = stepN * mag;
+  const out = [];
+  for (let v = 0; v <= max + step * 0.001; v += step) out.push(v);
+  return out.length > 1 ? out : [0, max];
+}
+
+/* Horizontal revenue bars: one series → one colour and no legend box (the card
+ * title says what is plotted). Shared by the category and model breakdowns. */
+function renderBars({ hostId, tableId, rows, labelKey, labelHeader, emptyText, onDrill }) {
+  const host = document.getElementById(hostId);
+  host.innerHTML = '';
+  if (!rows.length) { host.appendChild(el('div', 'empty', emptyText || 'No sales in this period.')); return; }
+  const max = Math.max(...rows.map(r => r.revenue), 1);
+
+  const wrap = el('div', 'bars');
+  for (const r of rows) {
+    const name = r[labelKey];
+    const row = el('div', 'bar-row' + (onDrill ? ' drillable' : ''));
+    row.tabIndex = 0;
+    if (onDrill) {
+      row.setAttribute('role', 'button');
+      row.onclick = () => onDrill(name);
+      row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrill(name); } };
+    }
+    const nameCell = el('div', 'cat', name);
+    nameCell.title = name;
+    row.appendChild(nameCell);
+    const track = el('div', 'bar-track');
+    const fill = el('div', 'bar-fill');
+    // A net-negative row (returns exceeding sales) cannot be drawn as a
+    // left-to-right bar. Draw no bar rather than a misleading one; the negative
+    // figure stays visible in the value column and the table view.
+    fill.style.width = Math.max(0, (r.revenue / max) * 100) + '%';
+    if (r.revenue < 0) { track.style.background = 'transparent'; track.title = 'Net negative — returns exceed sales'; }
+    track.appendChild(fill);
+    row.appendChild(track);
+    const valCell = el('div', 'val', money(r.revenue));
+    if (r.revenue < 0) valCell.style.color = 'var(--negative)';
+    row.appendChild(valCell);
+    row.appendChild(el('div', 'pct', pct(marginOf(r.gross_profit, r.revenue))));
+
+    const tip = evt => showTip(evt, name, [
+      ['Revenue', 'ZAR ' + money(r.revenue)],
+      ['Gross profit', 'ZAR ' + money(r.gross_profit)],
+      ['Margin', pct(marginOf(r.gross_profit, r.revenue))],
+      ['Units', nf0.format(r.units)]
+    ]);
+    row.addEventListener('mouseenter', tip);
+    row.addEventListener('mousemove', moveTip);
+    row.addEventListener('mouseleave', hideTip);
+    row.addEventListener('focus', e => {
+      const b = row.getBoundingClientRect();
+      tip({ clientX: b.left + 40, clientY: b.bottom });
+    });
+    row.addEventListener('blur', hideTip);
+    wrap.appendChild(row);
+  }
+  const head = el('div', 'bar-row');
+  head.appendChild(el('div', 'cat', ''));
+  head.appendChild(el('div', null, ''));
+  head.appendChild(el('div', 'pct', 'Revenue'));
+  head.appendChild(el('div', 'pct', 'Margin'));
+  host.appendChild(head);
+  host.appendChild(wrap);
+
+  // Totals row: the sum of every row shown, so it doubles as a check that the
+  // breakdown reconciles with the card's headline figure above it.
+  const totalUnits = rows.reduce((s, r) => s + (r.units || 0), 0);
+  const totalRevenue = rows.reduce((s, r) => s + (r.revenue || 0), 0);
+  const totalGP = rows.reduce((s, r) => s + (r.gross_profit || 0), 0);
+  const totalRow = el('div', 'bar-row total');
+  totalRow.appendChild(el('div', 'cat', 'Total'));
+  totalRow.appendChild(el('div', null, ''));
+  totalRow.appendChild(el('div', 'val', money(totalRevenue)));
+  totalRow.appendChild(el('div', 'pct', pct(marginOf(totalGP, totalRevenue))));
+  host.appendChild(totalRow);
+
+  // table-view twin — every value stays reachable without hovering
+  const table = document.getElementById(tableId);
+  table.innerHTML = '';
+  table.appendChild(buildTable(
+    [labelHeader, 'Units', 'Revenue (ZAR)', 'Gross profit (ZAR)', 'Margin'],
+    rows.map(r => [r[labelKey], nf0.format(r.units), money(r.revenue), money(r.gross_profit), pct(marginOf(r.gross_profit, r.revenue))]),
+    {
+      nameCol: 0,
+      totalRow: ['Total', nf0.format(totalUnits), money(totalRevenue), money(totalGP), pct(marginOf(totalGP, totalRevenue))]
+    }
+  ));
+}
+
+// ---------------------------------------------------------------- model breakdown
+// Drill state: null/null = models · model set = its trims · both = its sizes.
+let drillModel = null, drillTrim = null;
+let modelKind = 'complete'; // complete bikes only, vs every form incl. framesets
+
+const KINDS = [{ id: 'complete', label: 'Complete bikes' }, { id: 'all', label: 'All forms' }];
+
+function renderModelToggles() {
+  const box = document.getElementById('model-kind');
+  box.innerHTML = '';
+  for (const o of KINDS) {
+    const b = el('button', null, o.label);
+    b.setAttribute('aria-pressed', String(o.id === modelKind));
+    b.onclick = () => { modelKind = o.id; renderModelToggles(); load(); };
+    box.appendChild(b);
+  }
+}
+
+function renderCrumbs(level) {
+  const box = document.getElementById('model-crumbs');
+  box.innerHTML = '';
+  const push = (label, onClick) => {
+    if (box.children.length) box.appendChild(el('span', 'sep', '/'));
+    if (onClick) { const b = el('button', null, label); b.onclick = onClick; box.appendChild(b); }
+    else box.appendChild(el('span', 'current', label));
+  };
+  push('All models', level === 'model' ? null : () => { drillModel = null; drillTrim = null; load(); });
+  if (drillModel) push(drillModel, level === 'trim' ? null : () => { drillTrim = null; load(); });
+  if (drillTrim) push(drillTrim, null);
+}
+
+function renderModels(rows, coverage, drill) {
+  const level = drill?.level || 'model';
+  renderCrumbs(level);
+  const header = { model: 'Model', trim: 'Trim', size: 'Size' }[level];
+  renderBars({
+    hostId: 'model-chart', tableId: 'model-table', rows,
+    labelKey: 'model', labelHeader: header,
+    emptyText: 'No bike sales in this period.',
+    // Models and trims drill deeper; size is the leaf level.
+    onDrill: level === 'size' ? null : (name => {
+      if (level === 'model') drillModel = name; else drillTrim = name;
+      load();
+    })
+  });
+
+  // State how much bike revenue this breakdown does and does not represent, so
+  // the split is never mistaken for the whole of bike sales.
+  const note = document.getElementById('model-note');
+  const bits = [];
+  if (level === 'model') bits.push('Click a model to see its trims, then a trim to see its size mix.');
+  else if (level === 'trim') bits.push('Click a trim to see its size mix.');
+  else {
+    const sys = rows.find(r => r.size_system)?.size_system;
+    const sysLabel = { 'alpha': 'alpha sizing (S/M/L)', 's-sizing': 'Specialized S-Sizing (S1–S6)', 'cm': 'centimetre sizing', 'kids': 'kids sizing' }[sys] || 'mixed sizing';
+    bits.push(`Size mix for ${drillModel} ${drillTrim} — ${sysLabel}.`);
+  }
+  bits.push('Model, trim and size are read from the item description (the category tree supplies vocabulary and a cross-check).');
+  if (coverage) {
+    const other = coverage.non_bike_form_revenue || 0;
+    if (modelKind === 'complete' && other !== 0) {
+      bits.push(`Complete bikes only: ZAR ${money(coverage.complete_bike_revenue)}. A further ZAR ${money(other)} of bike-category revenue is framesets, bare frames, build kits and rentals — switch to “All forms” to include it.`);
+    } else if (modelKind === 'all') {
+      bits.push(`All forms, incl. framesets, frames, build kits and rentals (ZAR ${money(coverage.non_bike_form_revenue)} of the total).`);
+    }
+  }
+  note.textContent = bits.join(' ');
+}
+
+// ---------------------------------------------------------------- tables
+function buildTable(headers, rows, opts = {}) {
+  const t = el('table');
+  const thead = el('thead');
+  const hr = el('tr');
+  headers.forEach(h => hr.appendChild(el('th', null, h)));
+  thead.appendChild(hr);
+  t.appendChild(thead);
+  const tb = el('tbody');
+  for (const r of rows) {
+    const tr = el('tr');
+    r.forEach((c, i) => {
+      const td = el('td', i === opts.nameCol ? 'name' : (i === opts.rankCol ? 'rank' : null), c);
+      if (i === opts.nameCol) td.title = c;
+      // cellColor: genuinely-negative-value colouring, kept opt-in per table
+      // rather than a blanket "any minus sign" rule, since a rank column or a
+      // margin percentage can legitimately start with '−' without meaning
+      // "unfavourable" the way a budget shortfall does.
+      if (opts.cellColor) { const col = opts.cellColor(r, i); if (col) td.style.color = col; }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  // A totals row is the sanity check that the breakdown adds back up to the
+  // card it summarises — kept in a <tfoot> so it stays visually distinct from
+  // the individual rows above it, not just another line among many.
+  if (opts.totalRow) {
+    const tf = el('tfoot');
+    const tr = el('tr', 'total-row');
+    opts.totalRow.forEach((c, i) => {
+      tr.appendChild(el('td', i === opts.nameCol ? 'name' : null, c));
+    });
+    tf.appendChild(tr);
+    t.appendChild(tf);
+  }
+  return t;
+}
+
+function renderTopProducts(rows) {
+  const host = document.getElementById('top-products');
+  host.innerHTML = '';
+  document.getElementById('top-note').textContent = 'By revenue · ZAR, ex-VAT net of discounts';
+  if (!rows.length) { host.appendChild(el('div', 'empty', 'No sales in this period.')); return; }
+  host.appendChild(buildTable(
+    ['#', 'Product', 'Category', 'Units', 'Revenue', 'Gross profit', 'Margin'],
+    rows.map((r, i) => [
+      String(i + 1), r.product, r.category, nf0.format(r.units),
+      money(r.revenue), money(r.gross_profit), pct(marginOf(r.gross_profit, r.revenue))
+    ]),
+    { rankCol: 0, nameCol: 1 }
+  ));
+}
+
+// valueColor: CSS color for the headline figure — used ONLY for genuinely
+// unfavourable values (budget shortfall, discount given away, aged stock
+// capital), matching the source design's reservation of --negative for that
+// meaning specifically, never as decoration.
+function tile(label, value, foot, valueColor) {
+  const c = el('div', 'card tile');
+  c.appendChild(el('div', 'label', label));
+  const v = el('div', 'value std', value);
+  if (valueColor) v.style.color = valueColor;
+  c.appendChild(v);
+  if (foot) c.appendChild(el('div', 'foot', foot));
+  return c;
+}
+
+/* Attach rate: what leaves the shop alongside a complete bike. */
+function renderAttach(summary, byCategory) {
+  document.getElementById('attach-note').textContent =
+    'Non-bike items sold in the same transaction as a complete bike. A second bike in the same sale is not counted as an accessory.';
+  const box = document.getElementById('attach-kpis');
+  box.innerHTML = '';
+  const txns = summary.bike_transactions || 0;
+  const withAttach = summary.transactions_with_attachment || 0;
+  box.appendChild(tile('Bike transactions', nf0.format(txns)));
+  box.appendChild(tile('With an accessory', pct(txns ? withAttach / txns * 100 : 0), nf0.format(withAttach) + ' of ' + nf0.format(txns)));
+  box.appendChild(tile('Attached revenue', 'ZAR ' + money(summary.attached_revenue), nf0.format(summary.attached_units) + ' units'));
+  box.appendChild(tile('Per bike sold', 'ZAR ' + money(txns ? summary.attached_revenue / txns : 0)));
+
+  const host = document.getElementById('attach-table');
+  host.innerHTML = '';
+  if (!byCategory.length) { host.appendChild(el('div', 'empty', 'No attached sales in this period.')); return; }
+  host.appendChild(buildTable(
+    ['Attached category', 'Units', 'Revenue (ZAR)', 'Gross profit (ZAR)', 'Margin'],
+    byCategory.map(r => [r.category, nf0.format(r.units), money(r.revenue), money(r.gross_profit), pct(marginOf(r.gross_profit, r.revenue))]),
+    { nameCol: 0 }
+  ));
+}
+
+/* Discount leakage, measured against GROSS (list) revenue — discount over the
+ * already-discounted net would understate the giveaway. */
+function renderDiscounts(summary, byCategory, byModel) {
+  const disc = summary.total_discount || 0;
+  const gross = (summary.net_revenue || 0) + disc;
+  document.getElementById('discount-note').textContent =
+    'Line and transaction discounts, measured against gross (list) revenue.';
+  const box = document.getElementById('discount-kpis');
+  box.innerHTML = '';
+  box.appendChild(tile('Discount given', 'ZAR ' + money(disc), null, 'var(--negative)'));
+  box.appendChild(tile('Share of gross', pct(gross ? disc / gross * 100 : 0)));
+  box.appendChild(tile('Lines discounted', pct(summary.total_lines ? summary.discounted_lines / summary.total_lines * 100 : 0),
+    nf0.format(summary.discounted_lines) + ' of ' + nf0.format(summary.total_lines)));
+
+  const rowsFor = rs => rs.map(r => {
+    const g = (r.net_revenue || 0) + r.discount;
+    return [r.category ?? r.model, money(r.discount), pct(g ? r.discount / g * 100 : 0), money(r.net_revenue)];
+  });
+  const host = document.getElementById('discount-table');
+  host.innerHTML = '';
+  host.appendChild(buildTable(['Category', 'Discount (ZAR)', 'Share of gross', 'Net revenue (ZAR)'], rowsFor(byCategory), { nameCol: 0 }));
+  const mh = document.getElementById('discount-model-table');
+  mh.innerHTML = '';
+  mh.appendChild(buildTable(['Model', 'Discount (ZAR)', 'Share of gross', 'Net revenue (ZAR)'], rowsFor(byModel), { nameCol: 0 }));
+}
+
+/*
+ * Stock. Turn is a PROXY: true turn divides COGS by AVERAGE inventory, but the
+ * API exposes only a current snapshot, so the denominator is the closing
+ * position. It therefore reads high where stock has been run down and low where
+ * it has been built up — the card says as much rather than presenting it as exact.
+ */
+function renderStock(d) {
+  if (!d || d.empty) return;
+  const sum = d.summary || {};
+  const turn = sum.stock_value ? sum.trailing_cogs / sum.stock_value : null;
+
+  document.getElementById('stock-window').textContent =
+    `Stock as held now · trade measured over the 12 months to ${d.window.to}`;
+  document.getElementById('stock-note').textContent =
+    'Not affected by the period filter above: stock is a point-in-time position, so pairing it with an arbitrary date range would give a meaningless turn. ' +
+    'Turn is COGS ÷ closing stock at cost — a proxy for the textbook COGS ÷ average stock, since Lightspeed exposes only a current snapshot. A daily history is now being recorded so future periods can use a true average.';
+
+  const box = document.getElementById('stock-kpis');
+  box.innerHTML = '';
+  box.appendChild(tile('Stock on hand (at cost)', 'ZAR ' + money(sum.stock_value),
+    nf0.format(sum.stock_units) + ' units across ' + nf0.format(sum.stocked_skus) + ' SKUs'));
+  box.appendChild(tile('Stock turn (proxy)', turn == null ? '—' : nf1.format(turn) + '×',
+    'ZAR ' + compact(sum.trailing_cogs) + ' COGS over 12 months'));
+  box.appendChild(tile('Weeks of cover', turn ? nf1.format(52 / turn) : '—', 'At the trailing sales rate'));
+  box.appendChild(tile('Aged stock (no sales in 12m)', 'ZAR ' + money(d.deadTotal?.value || 0),
+    nf0.format(d.deadTotal?.skus || 0) + ' SKUs of capital tied up', 'var(--negative)'));
+
+  const turnOf = r => r.stock_value ? r.trailing_cogs / r.stock_value : null;
+  const host = document.getElementById('stock-table');
+  host.innerHTML = '';
+  host.appendChild(buildTable(
+    ['Category', 'Units held', 'Stock at cost (ZAR)', '12m COGS (ZAR)', 'Turn', 'Weeks cover'],
+    (d.byCategory || []).map(r => {
+      const t = turnOf(r);
+      return [r.category, nf0.format(r.qoh), money(r.stock_value), money(r.trailing_cogs),
+              t == null ? '—' : nf1.format(t) + '×',
+              t ? nf1.format(52 / t) : '—'];
+    }),
+    { nameCol: 0 }
+  ));
+
+  // Cover by model+size: the view that answers "am I holding sizes that don't sell?"
+  const cover = document.getElementById('stock-cover-table');
+  cover.innerHTML = '';
+  cover.appendChild(buildTable(
+    ['Model / size', 'Units held', 'Stock at cost (ZAR)', '12m units sold', 'Weeks cover'],
+    (d.bikeCover || []).map(r => [
+      r.label, nf0.format(r.qoh), money(r.stock_value), nf0.format(r.trailing_units),
+      r.trailing_units > 0 ? nf1.format(r.qoh * 52 / r.trailing_units) : 'no sales in 12m'
+    ]),
+    { nameCol: 0 }
+  ));
+
+  document.getElementById('stock-dead-note').textContent =
+    `Aged stock — held but nothing sold in the 12 months to ${d.window.to} (top 25 by capital tied up)`;
+  const dead = document.getElementById('stock-dead-table');
+  dead.innerHTML = '';
+  dead.appendChild(buildTable(
+    ['Product', 'Category', 'Units held', 'Stock at cost (ZAR)'],
+    (d.deadStock || []).map(r => [r.product || '(no description)', r.category, nf0.format(r.qoh), money(r.stock_value)]),
+    { nameCol: 0 }
+  ));
+
+  if (sum.negative_stock_skus > 0) {
+    dead.appendChild(el('div', 'note',
+      `${nf0.format(sum.negative_stock_skus)} SKUs show NEGATIVE stock on hand — sales recorded against stock that was never received. Those are excluded from the values above, but they mean the stock figures understate reality and the counts need correcting in Lightspeed.`));
+  }
+}
+
+/* Budget vs actual. Only the categories the sheet budgets are compared; anything
+ * unbudgeted is shown as context, never as variance. */
+function renderBudget(d) {
+  const win = document.getElementById('budget-window');
+  const note = document.getElementById('budget-note');
+  const kpis = document.getElementById('budget-kpis');
+  const table = document.getElementById('budget-table');
+  if (!d || d.missing) {
+    win.textContent = '';
+    note.textContent = 'Specialized Budget Data.xlsx was not found alongside the app, so there is nothing to compare against.';
+    kpis.innerHTML = ''; table.innerHTML = '';
+    return;
+  }
+  const e = d.effective, t = d.totals;
+  win.textContent = `Compared over ${e.from} to ${e.to}`;
+  const bits = [`Budget covers ${d.budgetRange.first} to ${d.budgetRange.last}; only the ${d.categories.length} budgeted categories are compared.`];
+  if (e.clipped) bits.push('The window was narrowed to where the budget and the trade data overlap, so both sides cover the same months.');
+  if (d.unbudgeted) bits.push(`A further ZAR ${money(d.unbudgeted)} of revenue sits in unbudgeted categories — shown for context, not counted as variance.`);
+  bits.push('Partial months are prorated by day.');
+  note.textContent = bits.join(' ');
+
+  kpis.innerHTML = '';
+  kpis.appendChild(tile('Budget for the period', 'ZAR ' + money(t.budget)));
+  kpis.appendChild(tile('Actual', 'ZAR ' + money(t.actual), 'Includes off-Lightspeed adjustments'));
+  const sign = t.variance >= 0 ? '+' : '−';
+  kpis.appendChild(tile('Variance', sign + 'ZAR ' + money(Math.abs(t.variance)),
+    t.variance_pct == null ? '' : (t.variance_pct >= 0 ? '+' : '') + nf1.format(t.variance_pct) + '% vs budget',
+    t.variance < 0 ? 'var(--negative)' : null));
+
+  table.innerHTML = '';
+  table.appendChild(buildTable(
+    ['Category', 'Budget (ZAR)', 'Actual (ZAR)', 'Variance (ZAR)', 'Variance %'],
+    d.comparison.map(r => [
+      r.category, money(r.budget), money(r.actual),
+      (r.variance >= 0 ? '+' : '−') + money(Math.abs(r.variance)),
+      r.variance_pct == null ? '—' : (r.variance_pct >= 0 ? '+' : '') + nf1.format(r.variance_pct) + '%'
+    ]),
+    { nameCol: 0, cellColor: (row, i) => (i === 3 || i === 4) && row[3].startsWith('−') ? 'var(--negative)' : null }
+  ));
+}
+
+// ---- trend: its own period, independent of the page filter ----
+let trendPreset = '12m';
+function trendRange(id) {
+  const [f, t] = rangeForPreset(id);
+  return [f, t];
+}
+function renderTrendPresets() {
+  const box = document.getElementById('trend-presets');
+  box.innerHTML = '';
+  for (const p of PRESETS) {
+    const b = el('button', null, p.label);
+    b.setAttribute('aria-pressed', String(p.id === trendPreset));
+    b.onclick = () => {
+      trendPreset = p.id;
+      const [f, t] = trendRange(p.id);
+      document.getElementById('trend-from').value = f;
+      document.getElementById('trend-to').value = t;
+      renderTrendPresets();
+      loadTrend();
+    };
+    box.appendChild(b);
+  }
+}
+async function loadTrend() {
+  const f = document.getElementById('trend-from').value;
+  const t = document.getElementById('trend-to').value;
+  const q = new URLSearchParams();
+  if (f) q.set('from', f);
+  if (t) q.set('to', t);
+  document.getElementById('trend-status').textContent = 'Loading…';
+  try {
+    const d = await (await fetch('/api/trend?' + q.toString())).json();
+    renderTrend(d.monthly || []);
+    document.getElementById('trend-status').textContent =
+      (f || t) ? `${f || '…'} to ${t || '…'}` : 'all time';
+  } catch (err) {
+    document.getElementById('trend-status').textContent = 'Error: ' + err.message;
+  }
+}
+
+// ---------------------------------------------------------------- notes (data-quality disclosure)
+function renderNotes(k) {
+  const revenue = k.revenue || 0;
+  const zero = k.zero_cost_revenue || 0;
+  // Both sides of this check must be Lightspeed-only: it proves the sale-level
+  // total (calc_subtotal - calc_discount) and the line-level total (summed
+  // across sale_lines) agree with each other. Comparing sale-level against
+  // k.revenue (which has Adjustments.xlsx folded in) would print the
+  // adjustments total as if it were a reconciliation gap between the two
+  // Lightspeed bases — a real bug this uncovered, not a rounding note.
+  const drift = (k.lightspeed_revenue ?? revenue) - (k.sale_level_revenue || 0);
+  const lines = [];
+  lines.push('Revenue is ex-VAT and net of discounts, counting only completed, non-voided sales — the same basis as the Lightspeed sales report.');
+  // Off-Lightspeed sales are included in the figures but always disclosed, since
+  // the Lightspeed-only number is the one that ties to the shop's own report.
+  if (lastData?.adjustments) {
+    const a = lastData.adjustments;
+    if (a.missing) {
+      lines.push('Adjustments.xlsx was not found alongside the app, so no off-Lightspeed sales are included.');
+    } else if (a.lines > 0) {
+      lines.push(`Includes ZAR ${money(a.revenue)} of revenue (${nf0.format(a.lines)} lines, ZAR ${money(a.gross_profit)} gross profit) from Adjustments.xlsx — sales made outside Lightspeed. Lightspeed alone accounts for ZAR ${money(k.lightspeed_revenue)}, which is the figure that ties to the Lightspeed report.`);
+      if (a.unmatched?.length) {
+        lines.push(`${a.unmatched.length} adjustment description(s) could not be matched to a catalogue item, so they sit outside the category split: ${a.unmatched.slice(0,3).join('; ')}.`);
+      }
+    }
+  }
+  if (zero > 0) {
+    lines.push(`ZAR ${money(zero)} of revenue (${pct((zero / revenue) * 100)}) has no unit cost on record in Lightspeed — labour and service lines legitimately carry no COGS, which is why Service Centre, Paarl Trails and Retul show margins near 100%. Blended margin is flattered by this; judge product margin on the goods categories.`);
+  }
+  if (k.returns_lines > 0) {
+    lines.push(`Includes ${nf0.format(k.returns_lines)} return/refund lines totalling ZAR ${money(k.returns_revenue)}, netted against revenue (the same basis as the Lightspeed report).`);
+  }
+  lines.push(`Line-level and sale-level revenue agree to within ZAR ${money(Math.abs(drift))}.`);
+  if (meta) lines.push(`Data last synced ${meta.lastSyncedAt ? new Date(meta.lastSyncedAt).toLocaleString('en-GB') : 'unknown'} · ${nf0.format(meta.counts.sales)} sales, ${nf0.format(meta.counts.sale_lines)} lines, ${nf0.format(meta.counts.items)} items.`);
+  document.getElementById('notes').innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+}
+
+// ---------------------------------------------------------------- load
+async function load() {
+  const content = document.getElementById('content');
+  const params = new URLSearchParams();
+  const f = document.getElementById('from').value, t = document.getElementById('to').value;
+  if (f) params.set('from', f);
+  if (t) params.set('to', t);
+  params.set('modelKind', modelKind);
+  if (drillModel) params.set('drillModel', drillModel);
+  if (drillTrim) params.set('drillTrim', drillTrim);
+  if (lastData) content.classList.add('refetching');
+  document.getElementById('status').textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/dashboard?' + params.toString());
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    lastData = data;
+    renderKpis(data.kpis);
+    renderBars({
+      hostId: 'cat-chart', tableId: 'cat-table', rows: data.byCategory,
+      labelKey: 'category', labelHeader: 'Category'
+    });
+    renderModels(data.byModel || [], data.modelCoverage, data.modelDrill);
+    renderTopProducts(data.topProducts);
+    renderAttach(data.attachSummary || {}, data.attachByCategory || []);
+    renderDiscounts(data.discountSummary || {}, data.discountByCategory || [], data.discountByModel || []);
+    // Stock is period-independent, so it is fetched once and not re-filtered.
+    fetch('/api/budget?' + params.toString()).then(r => r.json()).then(renderBudget).catch(() => {});
+    if (!stockLoaded) {
+      stockLoaded = true;
+      fetch('/api/stock').then(r => r.json()).then(renderStock).catch(() => {});
+    }
+    renderNotes(data.kpis);
+    const label = (f || t) ? `${f || meta?.min_date || '…'} to ${t || meta?.max_date || '…'}` : 'all time';
+    document.getElementById('status').textContent = 'Showing ' + label;
+  } catch (err) {
+    document.getElementById('status').textContent = 'Error: ' + err.message;
+  } finally {
+    content.classList.remove('refetching');
+  }
+}
+
+// ---------------------------------------------------------------- wiring
+document.getElementById('sidebar-hide').onclick = () => {
+  document.getElementById('sidebar').hidden = true;
+  document.getElementById('sidebar-show').hidden = false;
+};
+document.getElementById('sidebar-show').onclick = () => {
+  document.getElementById('sidebar').hidden = false;
+  document.getElementById('sidebar-show').hidden = true;
+};
+document.getElementById('trend-apply').onclick = () => { trendPreset = null; renderTrendPresets(); loadTrend(); };
+document.getElementById('apply').onclick = () => {
+  activePreset = null;
+  renderPresets();
+  load();
+};
+document.getElementById('resync').onclick = async () => {
+  const btn = document.getElementById('resync');
+  btn.disabled = true;
+  document.getElementById('status').textContent = 'Syncing new sales from Lightspeed…';
+  try {
+    const res = await fetch('/api/sync', { method: 'POST' });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'sync failed');
+    await boot();
+  } catch (err) {
+    document.getElementById('status').textContent = 'Sync error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+for (const btn of document.querySelectorAll('[data-toggle]')) {
+  btn.onclick = () => {
+    const key = btn.dataset.toggle;                       // 'cat' | 'model'
+    const chart = document.getElementById(key + '-chart');
+    const table = document.getElementById(key + '-table');
+    const showTable = table.hidden;
+    table.hidden = !showTable;
+    chart.hidden = showTable;
+    btn.textContent = showTable ? 'Show chart' : 'Show table';
+  };
+}
+window.addEventListener('scroll', hideTip, { passive: true });
+
+// Every figure here is computed from sale LINES (the only grain carrying cost,
+// category and item). If lines are missing the whole dashboard is legitimately
+// zero — say so loudly rather than rendering a silent blank.
+function renderBanner() {
+  const box = document.getElementById('banner');
+  if (!meta) { box.hidden = true; return; }
+  const lines = meta.counts.sale_lines;
+  const running = meta.syncRunningSince;
+  // A sync in flight, or missing line data, both mean the figures below are not
+  // yet the whole picture — never render an unexplained zero.
+  if (lines > 0 && !running) { box.hidden = true; return; }
+
+  box.hidden = false;
+  box.className = 'banner';
+  const bits = [];
+  if (lines === 0) {
+    bits.push('Revenue, gross profit, categories and product rankings are all derived from sale lines, of which ' +
+      `<b>none</b> are loaded yet (${nf0.format(meta.counts.sales)} sales and ${nf0.format(meta.counts.items)} items are in). ` +
+      'Every figure below will read zero until that phase completes, and <b>changing the date range will not help</b> — no period has line data yet.');
+  } else {
+    bits.push(`${nf0.format(lines)} sale lines loaded so far — figures below are incomplete and will keep rising until the sync finishes.`);
+  }
+  if (running) bits.push(`A sync has been running since ${new Date(running).toLocaleString('en-GB')}.`);
+  bits.push('Reload this page once it completes.');
+  box.innerHTML = '<div>⏳</div><div><strong>Sync in progress — figures are incomplete</strong>' +
+    '<div class="b-body">' + bits.join(' ') + '</div></div>';
+}
+
+async function boot() {
+  try {
+    meta = await (await fetch('/api/meta')).json();
+    document.getElementById('subtitle').textContent =
+      `Specialized Paarl · ${meta.min_date || '?'} to ${meta.max_date || '?'} · all figures ZAR`;
+  } catch { /* meta is best-effort */ }
+  renderBanner();
+  renderPresets();
+  renderModelToggles();
+  // Trend defaults to the last 12 months and is then driven only by its own filter.
+  const [tf, tt] = trendRange(trendPreset);
+  document.getElementById('trend-from').value = tf;
+  document.getElementById('trend-to').value = tt;
+  renderTrendPresets();
+  loadTrend();
+  await load();
+}
+boot();
+</script>
+</body>
+</html>

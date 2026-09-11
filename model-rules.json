@@ -1,0 +1,82 @@
+{
+  "_comment": [
+    "Rules for inferring bike MODEL and TRIM from an item's description text.",
+    "Edit this file and re-run `npm run classify` — no code changes needed.",
+    "",
+    "Why description-first: the Lightspeed category tree is maintained by hand, so it",
+    "has gaps (79% of BIKE items carry no trim node) and errors (the tree literally",
+    "contains the typo 'EPXERT'). An item's own description is entered per-product and",
+    "has proven more complete. The category tree is still used for the model vocabulary",
+    "and as a cross-check — see /api/model-audit for disagreements.",
+    "",
+    "extraModels: models seen in descriptions but absent from the category tree",
+    "  (usually discontinued ranges).",
+    "modelAliases: abbreviations used in descriptions -> canonical model name.",
+    "trims: canonical trim levels, matched longest-first. Aliases map to the canonical.",
+    "kinds: keyword -> item kind. A frameset, frame, build kit or rental is NOT a",
+    "  complete bike; lumping them together overstates model sales badly (a frameset",
+    "  and a complete bike differ by tens of thousands of rand)."
+  ],
+
+  "extraModels": [
+    "CAMBER", "SHIV", "DEMO", "FUSE", "PITCH", "SIRRUS", "CROSSTRAIL",
+    "VENGE", "SEQUOIA", "AWOL", "LANGSTER", "COMO",
+    "FATBOY", "CRAVE", "JYNX", "DOLCE", "ERA", "FATE", "HELLGA", "RUZE", "MYKA"
+  ],
+
+  "modelAliases": {
+    "SJ": "STUMPJUMPER",
+    "SJ EVO": "STUMPJUMPER EVO",
+    "EPIC WC": "EPIC WORLD CUP",
+    "EPIC MEN": "EPIC",
+    "EPIC WMN": "EPIC",
+    "RH": "ROCKHOPPER",
+    "P3": "P.3"
+  },
+
+  "trims": {
+    "S-WORKS":       ["S-WORKS", "SWORKS", "SW"],
+    "PRO":           ["PRO"],
+    "EXPERT":        ["EXPERT", "EPXERT"],
+    "COMP ALLOY HT": ["COMP ALLOY HT"],
+    "COMP CARBON":   ["COMP CARBON", "DSW COMP"],
+    "COMP ALLOY":    ["COMP ALLOY"],
+    "COMP":          ["COMP"],
+    "SPORT CARBON":  ["SPORT CARBON"],
+    "SPORT ALLOY":   ["SPORT ALLOY"],
+    "SPORT":         ["SPORT"],
+    "ELITE":         ["ELITE"],
+    "E5 COMP":       ["E5 COMP"],
+    "E5 ELITE":      ["E5 ELITE"],
+    "E5 SPORT":      ["E5 SPORT"],
+    "ALLOY HT":      ["ALLOY HT"],
+    "ALLOY":         ["ALLOY"],
+    "CARBON":        ["CARBON"],
+    "BASE":          ["BASE"]
+  },
+
+  "_sizeComment": [
+    "Frame size is read from the END of the description ('EPIC 8 SW CARB/BLUPRL L').",
+    "sizeAliases normalise spelling variants. wheelTokens are diameters, NOT frame",
+    "sizes — a description ending '29' or '27.5' names the wheel and carries no",
+    "size, so treating it as one would invent a size that does not exist.",
+    "Each size gets a SYSTEM: alpha (S/M/L), s-sizing (S1-S6, Specialized MTB),",
+    "cm (road/gravel, 38-64) or kids. Systems are never mixed on one axis because",
+    "'S4' and '56' are not comparable quantities."
+  ],
+
+  "sizeAliases": {
+    "SM": "S", "MD": "M", "LG": "L", "LNG": "L", "XXXL": "XXXL",
+    "M/L": "M/L", "S/M": "S/M"
+  },
+
+  "wheelTokens": ["26", "27.5", "29", "650B", "700C", "700"],
+
+  "kinds": {
+    "rental":   ["RENTAL", "DEMO BIKE", "TEST RIDE"],
+    "frameset": ["FRMSET", "FRAMESET", "FRAME SET"],
+    "frame":    ["FRM ", " FRM", "FRAME", "MODULE"],
+    "buildkit": ["BUILD KIT", "BUILDKIT"],
+    "part":     ["ASSEMBLY", "REAR STAY", "SWINGARM", "LINKAGE", "DECAL", "STICKER", "CHS MY"]
+  }
+}

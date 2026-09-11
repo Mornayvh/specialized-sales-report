@@ -1,0 +1,31 @@
+# Dependencies — regenerated via `npm install`, never committed.
+node_modules/
+
+# Secrets. .env holds the Lightspeed OAuth client ID/secret. Never commit this —
+# use .env.example as the template for what a fresh checkout needs to fill in.
+.env
+
+# Local database — the whole point of this being local is that the shop's live
+# sales/margin/cost data never leaves this machine via git. WAL/SHM are its
+# live sidecar files and are just as sensitive as the .sqlite file itself.
+data.sqlite
+data.sqlite-shm
+data.sqlite-wal
+
+# Sensitive business spreadsheets (off-Lightspeed adjustments, budget targets) —
+# real financial data, not source code. Kept locally only.
+Adjustments.xlsx
+Specialized Budget Data.xlsx
+design/uploads/*.xlsx
+
+# The Streamlit snapshot IS meant to be committed (see export-snapshot.js) — it
+# deliberately excludes tokens/employee names before it's written, so it is
+# safe for the repo. Nothing here should exclude snapshot.sqlite.
+
+.DS_Store
+*.log
+
+# Python (Streamlit local dev/testing only)
+.venv/
+__pycache__/
+*.pyc

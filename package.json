@@ -1,0 +1,21 @@
+{
+  "name": "specialized-sales-report",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "sync": "node sync.js",
+    "sync:incremental": "node sync.js --incremental",
+    "classify": "node classify-models.js",
+    "snapshot": "node export-snapshot.js",
+    "refresh": "npm run sync:incremental && npm run snapshot"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2"
+  }
+}
