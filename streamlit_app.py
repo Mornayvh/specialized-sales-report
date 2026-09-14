@@ -98,7 +98,12 @@ p, span, div, td, th, label { color: var(--text); }
   margin: -22px -28px 18px; padding: 14px 28px 15px;
   display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap;
 }
-.band h1 { font-size: 27px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; margin: 3px 0 2px; color: #fff; }
+.band h1 { font-size: 34px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; margin: 4px 0 2px; color: #fff !important; }
+/* Streamlit wraps markdown headings in an auto-generated inner <span> for its
+   anchor-link feature; that span is an unstyled type selector match for the
+   `span { color: var(--text) }` rule below, which otherwise wins over the
+   inherited white since inheritance always loses to any direct rule. */
+.band h1 span { color: #fff !important; }
 .kick { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--acc-300); }
 .bandnum { font-family: "Barlow Condensed", sans-serif; font-size: 17px; font-variant-numeric: tabular-nums; color: #fff; }
 .bandsub { font-size: 10px; color: var(--acc-300); font-variant-numeric: tabular-nums; }
@@ -106,7 +111,7 @@ p, span, div, td, th, label { color: var(--text); }
 .p2head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 22px 0 6px; margin-bottom: 4px; }
 .p2head h2 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
 
-.frame { border: 1px solid var(--divider); background: var(--bg); }
+.frame { border: 1px solid var(--divider); background: var(--bg); margin-bottom: 18px; }
 .ph { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; padding: 7px 10px 6px; border-bottom: 1px solid var(--divider); }
 .ph h3 { font-size: 14px; font-weight: 600; line-height: 1.1; margin: 0; letter-spacing: 0.01em; }
 .meta { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
@@ -140,11 +145,17 @@ table.dt tbody tr:last-child td { border-bottom: 0; }
 td.name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: normal; }
 td.rank { color: var(--muted-2); font-family: "Barlow Condensed", sans-serif; width: 18px; }
 
+/* Base sizing for bar-row value/margin text — NOT scoped to .brow, since the
+   drill-down panel builds these divs outside a .brow wrapper (Streamlit
+   columns) and must still match every other panel's 11px figures exactly. */
+.nm, .rv, .mg { font-size: 11px; font-variant-numeric: tabular-nums; }
+.rv, .mg { text-align: right; }
+.mg { color: var(--muted); }
+.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .brow { display: grid; grid-template-columns: 130px 1fr 90px 50px; gap: 8px; align-items: center; padding: 2px 0; }
-.brow .nm { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brow .rv, .brow .mg { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
-.brow .mg { color: var(--muted); }
-.brow.total { margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--rule); font-weight: 700; }
+.brow.total { margin-top: 8px; padding: 8px 0 2px; border-top: 1.5px solid var(--rule); }
+.brow.total .nm, .brow.total .rv, .brow.total .mg { font-size: 13px; font-weight: 700; }
 .brow.total .nm { font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
 .brow.total .mg { color: var(--text); }
 .track { background: var(--track); height: 9px; }
@@ -213,8 +224,16 @@ div[data-testid="stButton"] button {
 div[data-testid="stButton"] button:hover { color: var(--acc-900) !important; }
 div[data-testid="stButton"] button p { font-size: 11px !important; }
 
-[data-testid="stHorizontalBlock"] { gap: 11px !important; }
+[data-testid="stHorizontalBlock"] { gap: 11px !important; margin-bottom: 6px; }
 [data-testid="stDataFrame"] { font-family: "Barlow", sans-serif; }
+
+/* ---------- access-code box on the login page ---------- */
+div[data-testid="stTextInputRootElement"] {
+  border: 1.5px solid var(--rule) !important; border-radius: 0 !important; background: #fff !important;
+  box-shadow: none !important;
+}
+div[data-testid="stTextInputRootElement"]:focus-within { border-color: var(--acc-700) !important; }
+div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 14px !important; }
 </style>
 """
 st.markdown(STYLE, unsafe_allow_html=True)
@@ -242,8 +261,18 @@ def check_password():
     if st.session_state.get("password_ok"):
         return True
 
-    st.title("Sales Dashboard")
-    st.text_input("Access code", type="password", key="password_input", on_change=on_submit)
+    st.markdown(
+        '''<div class="band">
+          <div>
+            <div class="kick">Specialized Paarl &middot; Lightspeed Retail</div>
+            <h1>Sales Dashboard</h1>
+          </div>
+        </div>''',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="k" style="margin:4px 0 4px">Access code</div>', unsafe_allow_html=True)
+    st.text_input("Access code", type="password", key="password_input", on_change=on_submit,
+                  label_visibility="collapsed")
     if "password_ok" in st.session_state and not st.session_state["password_ok"]:
         st.error("Incorrect access code.")
     if not st.secrets.get("app_password"):
@@ -972,44 +1001,20 @@ top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"])
 top_body = html_table(["#", "Product", "Units", "Revenue", "GP", "Margin"], top_rows,
                        rank_col=0, name_col=1, empty_text="No sales in this period.")
 
-disc_summary = q1(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT COALESCE(SUM(sl.calc_line_discount + sl.calc_transaction_discount), 0) AS total_discount,
-           COALESCE(SUM(l.revenue), 0) AS net_revenue,
-           SUM(CASE WHEN sl.calc_line_discount + sl.calc_transaction_discount > 0 THEN 1 ELSE 0 END) AS discounted_lines,
-           COUNT(*) AS total_lines
-    FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
-""", params)
-gross = disc_summary["net_revenue"] + disc_summary["total_discount"]
-disc_stats = stats_html([
-    {"label": "Discount given", "value": zar(disc_summary["total_discount"]), "color": "var(--clay)"},
-    {"label": "Share of gross", "value": pct(disc_summary["total_discount"] / gross * 100 if gross else 0)},
-    {"label": "Lines discounted",
-     "value": pct(disc_summary["discounted_lines"] / disc_summary["total_lines"] * 100 if disc_summary["total_lines"] else 0),
-     "foot": f'{disc_summary["discounted_lines"]:,} of {disc_summary["total_lines"]:,}'},
-])
-disc_by_cat = q(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-           SUM(sl.calc_line_discount + sl.calc_transaction_discount) AS discount,
-           SUM(l.revenue) AS net_revenue
-    FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
-    LEFT JOIN items i ON i.item_id = l.item_id
-    LEFT JOIN categories c ON c.category_id = i.category_id
-    GROUP BY category
-    HAVING SUM(sl.calc_line_discount + sl.calc_transaction_discount) > 0
-    ORDER BY discount DESC
-""", params)
-disc_rows = []
-for _, r in disc_by_cat.head(8).iterrows():
-    g = (r["net_revenue"] or 0) + r["discount"]
-    disc_rows.append([r["category"], money(r["discount"]), pct(r["discount"] / g * 100 if g else 0), money(r["net_revenue"])])
-disc_body = disc_stats + html_table(["Category", "Discount", "Share of gross", "Net revenue"], disc_rows,
-                                     name_col=0, empty_text="No discounts in this period.")
+# Shopify sales breakdown — placeholder. There is no Shopify (or any online-channel)
+# data in snapshot.sqlite: `shops` has a single row (Specialized Paarl / Lightspeed
+# Retail), and adjustments.xlsx's off-Lightspeed rows are manual corrections (labour
+# charges, training, stock-take fixes), not tagged by sales channel. Showing a number
+# here would mean fabricating it, which this dashboard does not do — see Mornay for
+# where Shopify order data should be sourced from before this panel is built out.
+shopify_body = (
+    '<div class="empty">No Shopify data source is wired into this snapshot yet — '
+    'see the code comment above this panel for what is needed before it can be built.</div>'
+)
 
 col3, col4 = st.columns(2, gap="small")
 col3.markdown(frame("Top 10 products", "By revenue", top_body), unsafe_allow_html=True)
-col4.markdown(frame("Discount leakage", "Against gross list revenue", disc_body), unsafe_allow_html=True)
+col4.markdown(frame("Shopify sales breakdown", "Online channel", shopify_body), unsafe_allow_html=True)
 
 # ---------------------------------------------------------------- stock (never period-filtered)
 
