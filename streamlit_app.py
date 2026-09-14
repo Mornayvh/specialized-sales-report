@@ -33,6 +33,7 @@ Native Streamlit chrome that cannot be fully re-skinned (the period-preset
 and item-form radios, the date pickers) is restyled as closely as Streamlit's
 own component internals allow.
 """
+import base64
 import html as html_lib
 import hmac
 import sqlite3
@@ -43,6 +44,7 @@ import pandas as pd
 import streamlit as st
 
 DB_PATH = Path(__file__).parent / "snapshot.sqlite"
+LOGO_PATH = Path(__file__).parent / "logo.png"
 
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
 
@@ -53,6 +55,33 @@ def esc(s):
 
 class Raw(str):
     """A table cell value that is already-safe HTML — skip escaping."""
+
+
+@st.cache_data
+def logo_data_uri():
+    """The band's Specialized mark, inlined as a base64 data URI.
+
+    Inlined rather than served from disk because Streamlit only serves static
+    files when enableStaticServing is turned on AND the file sits under
+    ./static — and because a data URI is already decoded by the time
+    window.print() fires, where a still-loading <img> would print blank.
+
+    logo.png carries a .png extension but its bytes are actually AVIF (an
+    ISO-BMFF 'ftyp' box at offset 4), so the MIME type is sniffed rather than
+    taken from the filename: declaring image/png for AVIF bytes makes the
+    browser drop the image silently.
+    """
+    if not LOGO_PATH.exists():
+        return ""
+    raw = LOGO_PATH.read_bytes()
+    mime = "image/avif" if raw[4:8] == b"ftyp" else "image/png"
+    return f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+
+
+def logo_img():
+    """The band's right-hand mark, or nothing at all if logo.png is missing."""
+    uri = logo_data_uri()
+    return f'<img class="bandlogo" src="{uri}" alt="Specialized">' if uri else ""
 
 
 # ---------------------------------------------------------------- styling
@@ -105,8 +134,12 @@ p, span, div, td, th, label { color: var(--text); }
    inherited white since inheritance always loses to any direct rule. */
 .band h1 span { color: #fff !important; }
 .kick { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--acc-300); }
-.bandnum { font-family: "Barlow Condensed", sans-serif; font-size: 17px; font-variant-numeric: tabular-nums; color: #fff; }
 .bandsub { font-size: 10px; color: var(--acc-300); font-variant-numeric: tabular-nums; }
+/* The mark is white-on-transparent, so it sits straight on the navy with no
+   plate behind it. flex:none stops the flex row from squeezing it when the
+   heading block is wide; align-self centres it against that block, which is
+   taller than the mark and would otherwise bottom-align it (.band is flex-end). */
+.bandlogo { height: 64px; width: auto; flex: none; align-self: center; }
 /* Export to PDF — a real st.button, scoped via the marker-adjacency trick (same
    technique as the preset/kind radios above) so it gets a pill look instead of
    the plain-text-link style every other st.button on this page uses. */
@@ -314,8 +347,21 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
      over content and the top-of-document band clips away. Making the whole
      scaffold static/auto-height gives print a normally-flowing document
      (body scrollHeight becomes the real content height) so fragmentation,
-     backgrounds, and page breaks all behave. */
-  .stApp, [data-testid="stAppViewContainer"], section.stMain {
+     backgrounds, and page breaks all behave.
+
+     The earlier pass reset only .stApp / stAppViewContainer / stMain and the
+     band STILL vanished from a real Ctrl+P, because one scaffold element sits
+     between the last two and was missed: the unlabelled
+     `[data-testid="stAppViewContainer"] > div` (position:relative; inset:0),
+     which keeps a viewport-height box. Measured under print emulation: stMain
+     was 1181px tall while that wrapper — and therefore body and html above it
+     — stayed pinned at 1000px, so the printed document's root box was again
+     SHORTER than its own content and Chrome fragmented the overflow rather
+     than the document. Resetting it (and html/body/#root above it) makes
+     body's height equal stMain's real content height. */
+  html, body, #root, [data-testid="stScreencast"], .stApp,
+  [data-testid="stAppViewContainer"], [data-testid="stAppViewContainer"] > div,
+  section.stMain {
     position: static !important;
     inset: auto !important;
     height: auto !important;
@@ -335,17 +381,27 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
   div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { background: #fff !important; }
   [data-testid="stMainBlockContainer"] {
     box-shadow: none !important; margin: 0 !important; max-width: 100% !important;
-    padding: 6px 10px 4px !important;
+    /* No top padding — paired with .band's zeroed top margin below, so the very
+       first printed element never starts above the flow origin. */
+    padding: 0 10px 4px !important;
   }
   /* Screen sizing (readability on a monitor) is deliberately roomier than print
      needs — the original two-page print design this mirrors ran ~9-11px type
      throughout. Everything below tightens back toward that so the SAME content
      (same row limits, same panels) fits two landscape pages instead of four. */
-  .band { margin: -6px -10px 6px !important; padding: 8px 14px 9px !important; }
+  /* Screen bleeds the band out of the block container with a negative margin on
+     all three sides. In print the TOP one is dropped (the container's top
+     padding is zeroed to compensate, so the rendering is identical): a negative
+     top margin on the first element of a printed document puts its box above
+     the first fragmentainer's start, which Chrome resolves by clipping the band
+     away entirely. The side bleed is harmless and stays. break-after:avoid
+     keeps the band on the same page as the KPI tiles it heads. */
+  .band { margin: 0 -10px 6px !important; padding: 8px 14px 9px !important;
+          break-inside: avoid; break-after: avoid; }
+  .bandlogo { height: 42px !important; }
   .band h1 { font-size: 23px !important; margin: 2px 0 !important; }
   .kick { font-size: 8px !important; }
   .bandsub { font-size: 9px !important; }
-  .bandnum { font-size: 14px !important; }
   .kpis { gap: 6px !important; margin-bottom: 3px !important; }
   .kpis .frame { padding: 4px 8px 4px !important; }
   .kpis .v, .kpis .frame:first-child .v { font-size: 15px !important; }
@@ -450,11 +506,12 @@ def check_password():
         return True
 
     st.markdown(
-        '''<div class="band">
+        f'''<div class="band">
           <div>
             <div class="kick">Specialized Paarl &middot; Lightspeed Retail</div>
             <h1>Sales Dashboard</h1>
           </div>
+          {logo_img()}
         </div>''',
         unsafe_allow_html=True,
     )
@@ -845,12 +902,9 @@ st.markdown(
         <div class="kick">Specialized Paarl &middot; Lightspeed Retail</div>
         <h1>Sales Dashboard</h1>
         <div class="bandsub">{esc(preset)} &middot; {esc(period_text)} &middot; ZAR, ex-VAT and net of discounts</div>
-      </div>
-      <div style="text-align:right">
-        <div class="kick">Revenue &middot; gross profit &middot; margin</div>
-        <div class="bandnum">{zar(kpis['revenue'])} &middot; {zar(gp)} &middot; {pct(margin)}</div>
         <div class="bandsub">{sync_caption}</div>
       </div>
+      {logo_img()}
     </div>''',
     unsafe_allow_html=True,
 )
