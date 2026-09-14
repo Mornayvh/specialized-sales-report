@@ -107,13 +107,21 @@ p, span, div, td, th, label { color: var(--text); }
 .kick { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--acc-300); }
 .bandnum { font-family: "Barlow Condensed", sans-serif; font-size: 17px; font-variant-numeric: tabular-nums; color: #fff; }
 .bandsub { font-size: 10px; color: var(--acc-300); font-variant-numeric: tabular-nums; }
-.pdf-btn {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 11px;
-  letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 14px;
-  border: 1px solid var(--acc-400); border-radius: 0; background: var(--acc-400);
-  color: var(--acc-900); cursor: pointer;
+/* Export to PDF — a real st.button, scoped via the marker-adjacency trick (same
+   technique as the preset/kind radios above) so it gets a pill look instead of
+   the plain-text-link style every other st.button on this page uses. */
+div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button {
+  font-family: "Barlow Condensed", sans-serif !important; font-weight: 600; font-size: 11px !important;
+  letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 14px !important;
+  border: 1px solid var(--acc-400) !important; border-radius: 0 !important; background: var(--acc-400) !important;
+  color: var(--acc-900) !important; text-decoration: none !important; cursor: pointer;
 }
-.pdf-btn:hover { background: #fff; border-color: #fff; }
+div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button:hover {
+  background: #fff !important; border-color: var(--acc-900) !important;
+}
+div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button p {
+  font-size: 11px !important;
+}
 
 .p2head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 22px 0 6px; margin-bottom: 4px; }
 .p2head h2 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
@@ -251,7 +259,7 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
 @media print {
   @page { size: A4 landscape; margin: 10mm; }
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
-  [data-testid="stMainMenu"], .pdf-btn, .no-print { display: none !important; }
+  [data-testid="stMainMenu"], .no-print { display: none !important; }
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
   [data-testid="stMainBlockContainer"] { box-shadow: none !important; margin: 0 !important; max-width: 100% !important; }
   .frame, .kpis .frame { break-inside: avoid; }
@@ -568,10 +576,18 @@ st.sidebar.markdown('<div style="font-family:\'Barlow Condensed\',sans-serif;fon
 # toast nudges), all of which sit at a higher z-index and silently swallow clicks
 # on anything placed there. The sidebar is a separate DOM region Streamlit never
 # overlays, so this is the one placement guaranteed not to collide with its chrome.
-st.sidebar.markdown(
-    '<button class="pdf-btn" style="width:100%;margin-bottom:14px" onclick="window.print()">Export to PDF</button>',
-    unsafe_allow_html=True,
-)
+#
+# A raw `onclick="window.print()"` on an unsafe_allow_html button worked locally
+# but did nothing at all on Streamlit Community Cloud — inline event-handler
+# attributes are exactly what a strict Content-Security-Policy blocks first, and
+# Cloud's hosting layer applies one that the local dev server doesn't. A real
+# st.button() sidesteps that entirely (Streamlit's own click plumbing, not a raw
+# HTML attribute), and st.components.v1.html renders inside a proper iframe
+# document where a <script> tag actually executes — unlike unsafe_allow_html,
+# which the browser never runs embedded <script> tags for regardless of CSP.
+st.sidebar.markdown('<span class="marker-pdfbtn" style="display:none"></span>', unsafe_allow_html=True)
+if st.sidebar.button("Export to PDF", key="export_pdf_btn", use_container_width=True):
+    st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
 today = dt.date.today()
 
 if "preset" not in st.session_state:
