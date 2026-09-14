@@ -183,7 +183,11 @@ footer.notes { border-top: 1px solid var(--divider); padding-top: 10px; margin-t
 
 /* ---------- sidebar, restyled to match aside.filters ---------- */
 section[data-testid="stSidebar"] { background: var(--bg); border-right: 1px solid var(--divider); }
-section[data-testid="stSidebar"] * { font-family: "Barlow", system-ui, sans-serif; color: var(--text); }
+/* :not(...) excludes Streamlit's icon glyphs (e.g. the sidebar-collapse arrow) —
+   those render a literal word like "keyboard_double_arrow_left" as text, mapped
+   to an arrow glyph ONLY by their own icon font; forcing Barlow on them via a
+   blanket `*` rule broke that and showed the raw word instead of the icon. */
+section[data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) { font-family: "Barlow", system-ui, sans-serif; color: var(--text); }
 section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
   font-family: "Barlow Condensed", sans-serif; text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px;
 }
@@ -251,7 +255,23 @@ div[data-testid="stButton"] button {
   text-decoration: underline; text-underline-offset: 2px; text-align: left !important; min-height: 0 !important;
 }
 div[data-testid="stButton"] button:hover { color: var(--acc-900) !important; }
-div[data-testid="stButton"] button p { font-size: 11px !important; }
+/* Streamlit wraps button text in a <p>, which carries the browser's default
+   paragraph margin (~1em top/bottom) — invisible on a normal button because the
+   button's own padding usually dwarfs it, but here padding is zeroed for a
+   compact row, so that default margin was the actual floor on row height. */
+div[data-testid="stButton"] button p { font-size: 11px !important; margin: 0 !important; }
+/* OTHER/Total "buttons" are disabled — real buttons only for layout consistency
+   (see render_row) — restyle them to read as plain row labels, not greyed links. */
+div[data-testid="stButton"] button:disabled {
+  color: var(--text) !important; text-decoration: none !important; cursor: default !important; opacity: 1 !important;
+}
+/* The Total row's button — found via the marker-adjacency trick (:last-of-type
+   doesn't work here: st.columns wraps each row in its own stLayoutWrapper, so
+   every row's lone stHorizontalBlock trivially IS "the last of its type" within
+   that one-child wrapper — it matched EVERY row, not just the last one). */
+div[data-testid="stElementContainer"]:has(.marker-total-row) + div[data-testid="stLayoutWrapper"] button:disabled {
+  font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em; font-size: 13px !important;
+}
 
 [data-testid="stHorizontalBlock"] { gap: 11px !important; margin-bottom: 6px; }
 [data-testid="stDataFrame"] { font-family: "Barlow", sans-serif; }
@@ -316,18 +336,49 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
   .empty { padding: 3px 0 !important; }
   [data-testid="stHorizontalBlock"] { margin-bottom: 0 !important; gap: 7px !important; }
   [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { gap: 0 !important; }
+  /* A plain st.markdown row here (the coverage note, or previously the OTHER
+     row before it switched to a button) intermittently rendered SHORTER than
+     its own wrapped text under print's narrower width — a real Chromium bug,
+     confirmed by measuring computed height directly: the element's box came
+     out smaller than its child content's own measured height, with no
+     min/max-height or overflow to explain it. Reproduces only when this
+     container is a flex column; content overflowed into the next sibling.
+     display:block sidesteps the entire bug — plain block flow always sizes to
+     content — at the cost of using margins instead of flex `gap` for spacing. */
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { display: block !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > * { margin-bottom: 1.5px !important; }
+  /* display:block (above) didn't fully fix it either — the coverage note's own
+     box still measured shorter than its wrapped 2-line text even in block flow.
+     Brute-force workaround: give it enough margin to clear the shortfall no
+     matter how short the buggy box measures, since margin pushes the next
+     sibling down independently of the (buggy) content-box height. */
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stElementContainer"]:has(.coverage-note) {
+    margin-bottom: 18px !important;
+  }
   /* The Bike sales by model drill-down uses native st.button/st.columns rows
      (inline-styled, not the .brow class the other bar lists use), so none of
      the .brow rules above touch it — it needs its own print shrink. */
   div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stHorizontalBlock"] { gap: 4px !important; }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[style*="padding:3px 0"] { padding: 0 !important; }
+  /* Browsers normalize a `style="...padding:3px 0"` attribute to "padding: 3px 0px"
+     (space after the colon, unit on the zero) — matching the raw string I write in
+     Python here never actually matched anything until this was fixed. */
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[style*="padding: 3px 0px"] { padding: 0 !important; }
+  /* Height still floors around 16px after zeroing every padding/margin down the
+     button's own DOM chain (button > div > span > span > div > p) — some element
+     in there keeps its own line-height-driven intrinsic height regardless. A
+     forced fixed height is the only thing that actually wins. */
   div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button {
     font-size: 8.5px !important; line-height: 1.15 !important; padding: 0 !important; min-height: 0 !important;
+    height: 10px !important; display: flex !important; align-items: center !important;
   }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button p { font-size: 8.5px !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button p {
+    font-size: 8.5px !important; line-height: 1 !important;
+  }
   div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .rv, div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .mg {
     font-size: 8.5px !important;
+  }
+  div[data-testid="stElementContainer"]:has(.marker-total-row) + div[data-testid="stLayoutWrapper"] button:disabled {
+    font-size: 9.5px !important;
   }
   .p2head { break-before: page; padding: 0 0 3px !important; margin-bottom: 3px !important; }
   .p2head h2 { font-size: 15px !important; }
@@ -985,7 +1036,7 @@ with model_col:
 
         if level == "model" and kind_filter == "Complete bikes" and coverage["other_rev"]:
             st.markdown(
-                f'<div class="note" style="margin-bottom:4px">Complete bikes only: {zar(coverage["complete_rev"])}. '
+                f'<div class="note coverage-note" style="margin-bottom:4px">Complete bikes only: {zar(coverage["complete_rev"])}. '
                 f'A further {zar(coverage["other_rev"])} of bike-category revenue is framesets, bare frames, '
                 f'build kits and rentals — switch to "All forms" to include it.</div>',
                 unsafe_allow_html=True,
@@ -997,49 +1048,57 @@ with model_col:
         if model_rows and level != "size":
             shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
             max_rev = max([r["revenue"] for r in shown_m] + [1])
-            total_html = (
-                f'<div class="brow total"><div class="nm">Total</div><div></div>'
-                f'<div class="rv">{money(tot_rev_m)}</div><div class="mg">{pct(margin_of(tot_gp_m, tot_rev_m))}</div></div>'
-            )
+
+            # Every row — regular, OTHER, and Total — uses the SAME st.columns([1, 2])
+            # split for the name vs. bar/value/margin. They used to diverge: OTHER and
+            # Total rendered through the fixed-pixel .brow CSS grid (to dodge a
+            # Streamlit column-collapse bug under narrow widths — see history), while
+            # regular rows used st.columns' proportional split. Those two mechanisms
+            # size the name column differently, so numbers didn't line up between rows.
+            # Rendering every row the same way is what actually fixes that.
+            def render_row(label, revenue, gross_profit, width, color, key, *, clickable=False, bold=False):
+                row_cols = st.columns([1, 2], gap="small")
+                # OTHER and Total render an actual (disabled) button here too, not a plain
+                # <div> — a plain-markdown first column, under the narrower effective width
+                # of a print page, tripped Streamlit's own column-wrap measurement and
+                # collapsed that row to zero height, overlapping the row below it. Every
+                # *real* button-based row never showed that bug, so giving every row a
+                # button element (disabled where there's nothing to click) sidesteps it,
+                # and disabled buttons are restyled via CSS to look identical to plain text.
+                clicked = row_cols[0].button(label, key=key, disabled=not clickable)
+                val_style = "font-size:13px;font-weight:700" if bold else ""
+                fill_html = "" if bold else f'<div class="fill" style="width:{width:.2f}%;background:{color}"></div>'
+                row_cols[1].markdown(
+                    f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
+                    f'<div class="track" style="flex:1 1 auto">{fill_html}</div>'
+                    f'<div class="rv" style="flex:0 0 auto;white-space:nowrap;{val_style}">{money(revenue)}</div>'
+                    f'<div class="mg" style="flex:0 0 auto;white-space:nowrap;width:40px;{val_style}">{pct(margin_of(gross_profit, revenue))}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                return clicked
+
             for i, r in enumerate(shown_m):
                 is_other = r["label"].startswith("OTHER (")
                 width = max(0.0, r["revenue"] / max_rev * 100) if max_rev else 0.0
                 color = "var(--acc-800)" if i == 0 else ("var(--acc-600)" if i < 3 else "var(--acc-400)")
                 if is_other:
-                    # Plain .brow markup, not st.columns — this row has no button. Combined
-                    # into ONE markdown call with the Total row right below (rather than
-                    # two separate st.markdown/element-container calls): Streamlit's own
-                    # flex layout between two adjacent but separately-rendered containers
-                    # here, one with a button-based sibling above it and one without,
-                    # rendered them overlapping under a narrower width (e.g. a print page).
-                    # Keeping them in one container sidesteps that entirely.
-                    st.markdown(
-                        f'<div class="brow"><div class="nm">{esc(r["label"])}</div>'
-                        f'<div class="track"><div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
-                        f'<div class="rv">{money(r["revenue"])}</div>'
-                        f'<div class="mg">{pct(margin_of(r["gross_profit"], r["revenue"]))}</div></div>'
-                        + total_html,
-                        unsafe_allow_html=True,
-                    )
-                    total_html = None
+                    render_row(r["label"], r["revenue"], r["gross_profit"], width, color, key=f"other_{level}_{i}")
                     continue
-                row_cols = st.columns([1, 2], gap="small")
-                if row_cols[0].button(r["label"], key=f"drill_{level}_{i}_{r['label']}"):
+                if render_row(r["label"], r["revenue"], r["gross_profit"], width, color,
+                               key=f"drill_{level}_{i}_{r['label']}", clickable=True):
                     if level == "model":
                         st.session_state.drill_model = r["label"]
                     else:
                         st.session_state.drill_trim = r["label"]
                     st.rerun()
-                row_cols[1].markdown(
-                    f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
-                    f'<div class="track" style="flex:1 1 auto"><div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
-                    f'<div class="rv" style="flex:0 0 auto;white-space:nowrap">{money(r["revenue"])}</div>'
-                    f'<div class="mg" style="flex:0 0 auto;white-space:nowrap;width:40px">{pct(margin_of(r["gross_profit"], r["revenue"]))}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-            if total_html is not None:
-                st.markdown(total_html, unsafe_allow_html=True)
+
+            st.markdown(
+                '<span class="marker-total-row" style="display:none"></span>'
+                '<div style="border-top:1.5px solid var(--rule);margin-top:4px;padding-top:2px"></div>',
+                unsafe_allow_html=True,
+            )
+            render_row("Total", tot_rev_m, tot_gp_m, 0, "transparent", key=f"total_{level}", bold=True)
         else:
             shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
             st.markdown(bars_html(shown_m, tot_rev_m, tot_gp_m, empty_text="No bike sales in this period."),
