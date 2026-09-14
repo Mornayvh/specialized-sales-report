@@ -563,6 +563,15 @@ PRESETS = {
 st.sidebar.markdown('<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;'
                      'font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:6px">Filters</div>',
                      unsafe_allow_html=True)
+# Lives in the sidebar deliberately — the top-right of the main content area is
+# Streamlit's own reserved territory (header menu, deploy button, promotional
+# toast nudges), all of which sit at a higher z-index and silently swallow clicks
+# on anything placed there. The sidebar is a separate DOM region Streamlit never
+# overlays, so this is the one placement guaranteed not to collide with its chrome.
+st.sidebar.markdown(
+    '<button class="pdf-btn" style="width:100%;margin-bottom:14px" onclick="window.print()">Export to PDF</button>',
+    unsafe_allow_html=True,
+)
 today = dt.date.today()
 
 if "preset" not in st.session_state:
@@ -664,13 +673,10 @@ st.markdown(
         <h1>Sales Dashboard</h1>
         <div class="bandsub">{esc(preset)} &middot; {esc(period_text)} &middot; ZAR, ex-VAT and net of discounts</div>
       </div>
-      <div style="display:flex; gap:20px; align-items:flex-end">
-        <div style="text-align:right">
-          <div class="kick">Revenue &middot; gross profit &middot; margin</div>
-          <div class="bandnum">{zar(kpis['revenue'])} &middot; {zar(gp)} &middot; {pct(margin)}</div>
-          <div class="bandsub">{sync_caption}</div>
-        </div>
-        <button class="pdf-btn" onclick="window.print()">Export to PDF</button>
+      <div style="text-align:right">
+        <div class="kick">Revenue &middot; gross profit &middot; margin</div>
+        <div class="bandnum">{zar(kpis['revenue'])} &middot; {zar(gp)} &middot; {pct(margin)}</div>
+        <div class="bandsub">{sync_caption}</div>
       </div>
     </div>''',
     unsafe_allow_html=True,
