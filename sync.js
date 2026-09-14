@@ -136,20 +136,20 @@ async function syncAll({ since, startedAt, isFull }) {
   // SaleLine revenue (ex-VAT, net of discount) = calc_subtotal - calc_line_discount - calc_transaction_discount.
   // Validity (completed/voided) is determined via JOIN to sales, not stored redundantly here.
   const upsertLine = db.prepare(`
-    INSERT INTO sale_lines (sale_line_id, sale_id, item_id, employee_id, shop_id, quantity, calc_subtotal, calc_line_discount, calc_transaction_discount, fifo_cost, avg_cost)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO sale_lines (sale_line_id, sale_id, item_id, employee_id, shop_id, quantity, calc_subtotal, calc_line_discount, calc_transaction_discount, fifo_cost, avg_cost, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(sale_line_id) DO UPDATE SET
       sale_id = excluded.sale_id, item_id = excluded.item_id, employee_id = excluded.employee_id,
       shop_id = excluded.shop_id, quantity = excluded.quantity, calc_subtotal = excluded.calc_subtotal,
       calc_line_discount = excluded.calc_line_discount, calc_transaction_discount = excluded.calc_transaction_discount,
-      fifo_cost = excluded.fifo_cost, avg_cost = excluded.avg_cost
+      fifo_cost = excluded.fifo_cost, avg_cost = excluded.avg_cost, source = excluded.source
   `);
   const saleLines = await lsFetchAll(withSince('/SaleLine.json', since), 'SaleLine', 100, (batch, totalSoFar) => {
     for (const l of batch) {
       upsertLine.run(
         l.saleLineID, l.saleID, l.itemID, l.employeeID ?? null, l.shopID,
         Number(l.unitQuantity), Number(l.calcSubtotal), Number(l.calcLineDiscount), Number(l.calcTransactionDiscount),
-        Number(l.fifoCost), Number(l.avgCost)
+        Number(l.fifoCost), Number(l.avgCost), l.source || null
       );
     }
     if (totalSoFar % 2000 < 100) console.log(`Sale lines synced so far: ${totalSoFar}`);

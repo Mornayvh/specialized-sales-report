@@ -1001,16 +1001,74 @@ top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"])
 top_body = html_table(["#", "Product", "Units", "Revenue", "GP", "Margin"], top_rows,
                        rank_col=0, name_col=1, empty_text="No sales in this period.")
 
-# Shopify sales breakdown — placeholder. There is no Shopify (or any online-channel)
-# data in snapshot.sqlite: `shops` has a single row (Specialized Paarl / Lightspeed
-# Retail), and adjustments.xlsx's off-Lightspeed rows are manual corrections (labour
-# charges, training, stock-take fixes), not tagged by sales channel. Showing a number
-# here would mean fabricating it, which this dashboard does not do — see Mornay for
-# where Shopify order data should be sourced from before this panel is built out.
-shopify_body = (
-    '<div class="empty">No Shopify data source is wired into this snapshot yet — '
-    'see the code comment above this panel for what is needed before it can be built.</div>'
-)
+# Shopify sales breakdown. sale_lines.source is Lightspeed's own per-line sales-
+# channel attribute (same field as the "Source" column on Lightspeed's Sale Lines
+# report — values seen: Shopify, Hubtiger, or blank for a native Lightspeed/POS
+# sale). It was added to the sync pipeline (db.js/sync.js) alongside this panel;
+# an OLD snapshot.sqlite predating that change won't have the column yet, and even
+# a fresh one only has it for sale lines synced (or re-synced) since. Incremental
+# syncs don't touch unchanged historical rows — a full `npm run sync` is needed at
+# least once to backfill it — so this checks for the column rather than assuming.
+sale_line_cols = set(q("PRAGMA table_info(sale_lines)")["name"])
+if "source" not in sale_line_cols:
+    shopify_body = (
+        '<div class="empty">sale_lines.source (Shopify / Hubtiger / native channel) is not in this '
+        'snapshot yet. Run a full <code>npm run sync</code> on the source machine — incremental syncs '
+        "won't backfill historical rows — then <code>npm run snapshot</code> and push.</div>"
+    )
+else:
+    shopify_summary = q1(f"""
+        WITH {VALID_SALE_CTE}
+        SELECT
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
+          COUNT(DISTINCT CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
+          COALESCE(SUM(l.revenue), 0) AS total_revenue
+        FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
+    """, params)
+    shopify_gp = shopify_summary["shopify_revenue"] - shopify_summary["shopify_cogs"]
+    shopify_share = (shopify_summary["shopify_revenue"] / shopify_summary["total_revenue"] * 100
+                      if shopify_summary["total_revenue"] else 0)
+    shopify_stats = stats_html([
+        {"label": "Shopify revenue", "value": zar(shopify_summary["shopify_revenue"])},
+        {"label": "Gross profit", "value": zar(shopify_gp)},
+        {"label": "Margin", "value": pct(margin_of(shopify_gp, shopify_summary["shopify_revenue"]))},
+        {"label": "Share of total revenue", "value": pct(shopify_share),
+         "foot": f"{shopify_summary['shopify_transactions']:,.0f} transactions, {shopify_summary['shopify_units']:,.0f} units"},
+    ])
+    shopify_by_cat = q(f"""
+        WITH {VALID_SALE_CTE}
+        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
+               SUM(l.revenue) AS revenue, SUM(l.revenue) - SUM(l.cogs) AS gross_profit, SUM(l.quantity) AS units
+        FROM lines l
+        JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
+        LEFT JOIN items i ON i.item_id = l.item_id
+        LEFT JOIN categories c ON c.category_id = i.category_id
+        WHERE UPPER(TRIM(sl.source)) = 'SHOPIFY'
+        GROUP BY category
+        HAVING SUM(l.revenue) <> 0
+        ORDER BY revenue DESC
+    """, params)
+    shopify_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
+                      pct(margin_of(r["gross_profit"], r["revenue"]))]
+                     for _, r in shopify_by_cat.head(8).iterrows()]
+    shopify_table = html_table(["Category", "Units", "Revenue", "GP", "Margin"], shopify_rows, name_col=0,
+                                empty_text="No Shopify-sourced sales in this period.")
+
+    other_channels = q(f"""
+        WITH {VALID_SALE_CTE}
+        SELECT COALESCE(NULLIF(TRIM(sl.source), ''), 'Lightspeed POS') AS channel,
+               SUM(l.revenue) AS revenue
+        FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
+        WHERE UPPER(TRIM(COALESCE(sl.source, ''))) <> 'SHOPIFY'
+        GROUP BY channel
+        HAVING SUM(l.revenue) <> 0
+        ORDER BY revenue DESC
+    """, params)
+    other_bits = "; ".join(f"{esc(r['channel'])} {zar(r['revenue'])}" for _, r in other_channels.iterrows())
+    other_note = f'<div class="note" style="margin-top:6px">Other channels for context: {other_bits}.</div>' if other_bits else ""
+    shopify_body = shopify_stats + shopify_table + other_note
 
 col3, col4 = st.columns(2, gap="small")
 col3.markdown(frame("Top 10 products", "By revenue", top_body), unsafe_allow_html=True)
