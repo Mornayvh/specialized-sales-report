@@ -223,12 +223,26 @@ section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
   border: 1px solid var(--divider); border-radius: 0; font-size: 11px; color: var(--text);
 }
 
-/* Bordered drill-down panel — the one container(border=True) frame in the app. */
+/* Bordered drill-down panel — the one container(border=True) frame in the app.
+   .ph (the header) carries its own padding and sits flush against the border,
+   matching every other panel's header. Everything after it — crumbs, the
+   Complete-bikes toggle, the coverage note, each model row, the total — used to
+   rely on a `<div class="pb">` opened in one st.markdown call and closed in a
+   much later one, which does NOT actually wrap the intervening st.button/
+   st.columns calls (each st.markdown/st.button is its own independent DOM
+   fragment) — so that padding never applied at all. Fixed by padding every
+   direct child but the header via CSS instead. */
 div[data-testid="stVerticalBlock"][data-test-scroll-behavior] {
   border: 1px solid var(--divider) !important; border-radius: 0 !important; padding: 0 !important;
-  background: var(--bg); gap: 2px !important;
+  background: var(--bg); gap: 4px !important;
 }
 div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stElementContainer"] { margin: 0 !important; }
+div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stElementContainer"]:not(:first-child),
+div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stHorizontalBlock"] {
+  padding: 0 10px !important;
+}
+div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > *:nth-child(2) { margin-top: 7px !important; }
+div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > *:last-child { padding-bottom: 9px !important; }
 
 /* Drill / crumb buttons rendered as plain text links, matching .brow .drill and .crumbs button. */
 div[data-testid="stButton"] button {
@@ -931,7 +945,6 @@ with model_col:
 
         st.markdown(f'<div class="ph"><h3>Bike sales by model</h3><div class="meta">Revenue &middot; margin</div></div>',
                     unsafe_allow_html=True)
-        st.markdown('<div class="pb">', unsafe_allow_html=True)
 
         crumb_row = st.columns([1, 1, 2], gap="small")
         if crumb_row[0].button("All models", disabled=not st.session_state.drill_model, key="crumb_all"):
@@ -1031,8 +1044,6 @@ with model_col:
             shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
             st.markdown(bars_html(shown_m, tot_rev_m, tot_gp_m, empty_text="No bike sales in this period."),
                         unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
 with attach_col:
     attach_summary = q1(f"""
