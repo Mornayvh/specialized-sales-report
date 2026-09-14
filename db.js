@@ -17,6 +17,13 @@ if (lineRebuilt) {
   db.exec('DROP TABLE sale_lines');
 }
 
+// Migration: an earlier version of this file added sale_lines.source, guessing at
+// a channel field that doesn't actually exist on the SaleLine API resource (it was
+// always NULL). Drop it — the real field is sales.reference_number_source, below.
+if (!lineRebuilt && lineCols.includes('source')) {
+  db.exec('ALTER TABLE sale_lines DROP COLUMN source');
+}
+
 // Migration: items previously held only a description. category_id is needed for the
 // category breakdown, so rebuild from the (fast) bulk Item endpoint.
 const itemCols = db.prepare("PRAGMA table_info(items)").all().map(c => c.name);
@@ -32,14 +39,14 @@ if (saleCols.length && !saleCols.includes('complete_time')) {
   db.exec('ALTER TABLE sales ADD COLUMN complete_time TEXT');
 }
 
-// Migration: source added for the Shopify/Hubtiger/Lightspeed sales-channel
-// breakdown. ADD COLUMN (not drop/rebuild) so existing synced history survives —
-// but a column added this way is NULL on every already-synced row. Only a FULL
-// sync (`npm run sync`, not the incremental refresh) re-fetches unchanged
-// SaleLine rows and backfills it; until that runs, the channel breakdown will
-// undercount or read empty for historical periods.
-if (!lineRebuilt && lineCols.length && !lineCols.includes('source')) {
-  db.exec('ALTER TABLE sale_lines ADD COLUMN source TEXT');
+// Migration: reference_number / reference_number_source added for the
+// Shopify/Hubtiger/native sales-channel breakdown (see the sales table comment
+// above). ADD COLUMN so existing synced history survives — but it's NULL on
+// every already-synced row. Only a FULL sync (`npm run sync`, not the
+// incremental refresh) re-fetches unchanged Sale rows and backfills it.
+if (saleCols.length && !saleCols.includes('reference_number_source')) {
+  db.exec('ALTER TABLE sales ADD COLUMN reference_number TEXT');
+  db.exec('ALTER TABLE sales ADD COLUMN reference_number_source TEXT');
 }
 
 // Migration: frame size added to the derived classification.
@@ -121,6 +128,12 @@ db.exec(`
   -- complete_time is when the sale actually closed and is the correct basis for
   -- period reporting; sale_time (timeStamp) is last-modified and drifts if a sale
   -- is edited later. Filter on COALESCE(complete_time, sale_time).
+  -- reference_number_source is Lightspeed's own field for "name of the external
+  -- system for referenceNumber" (Sale resource, per developers.lightspeedhq.com) —
+  -- e.g. Shopify or Hubtiger when a sale was pushed in via that integration, NULL
+  -- for a native POS sale. This is a Sale-level field, NOT a SaleLine one — an
+  -- earlier version of this schema wrongly guessed at a SaleLine.source that does
+  -- not exist on the API and was always empty.
   CREATE TABLE IF NOT EXISTS sales (
     sale_id TEXT PRIMARY KEY,
     employee_id TEXT,
@@ -130,7 +143,9 @@ db.exec(`
     completed INTEGER,
     voided INTEGER,
     calc_subtotal REAL,
-    calc_discount REAL
+    calc_discount REAL,
+    reference_number TEXT,
+    reference_number_source TEXT
   );
 
   -- One row per SaleLine. Line revenue (ex-VAT, net of discount) =
@@ -138,9 +153,6 @@ db.exec(`
   -- Always filter via JOIN sales ON sale_id WHERE completed = 1 AND voided = 0.
   -- fifo_cost/avg_cost are PER UNIT and captured at time of sale, so line COGS is
   -- quantity * cost. Using the item's current cost would misstate historical margin.
-  -- source is the sales channel Lightspeed attributes the line to (e.g. Shopify,
-  -- Hubtiger, or NULL for a native Lightspeed/POS sale) — same field as the
-  -- "Source" column on Lightspeed's own Sale Lines report.
   CREATE TABLE IF NOT EXISTS sale_lines (
     sale_line_id TEXT PRIMARY KEY,
     sale_id TEXT,
@@ -152,8 +164,7 @@ db.exec(`
     calc_line_discount REAL,
     calc_transaction_discount REAL,
     fifo_cost REAL,
-    avg_cost REAL,
-    source TEXT
+    avg_cost REAL
   );
 
   -- last_synced_at is the incremental watermark. It may ONLY advance on a run that

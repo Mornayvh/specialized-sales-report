@@ -1001,31 +1001,34 @@ top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"])
 top_body = html_table(["#", "Product", "Units", "Revenue", "GP", "Margin"], top_rows,
                        rank_col=0, name_col=1, empty_text="No sales in this period.")
 
-# Shopify sales breakdown. sale_lines.source is Lightspeed's own per-line sales-
-# channel attribute (same field as the "Source" column on Lightspeed's Sale Lines
-# report — values seen: Shopify, Hubtiger, or blank for a native Lightspeed/POS
-# sale). It was added to the sync pipeline (db.js/sync.js) alongside this panel;
-# an OLD snapshot.sqlite predating that change won't have the column yet, and even
-# a fresh one only has it for sale lines synced (or re-synced) since. Incremental
-# syncs don't touch unchanged historical rows — a full `npm run sync` is needed at
-# least once to backfill it — so this checks for the column rather than assuming.
-sale_line_cols = set(q("PRAGMA table_info(sale_lines)")["name"])
-if "source" not in sale_line_cols:
+# Shopify sales breakdown. sales.reference_number_source is Lightspeed's own
+# field, documented as "name of the external system for referenceNumber" on the
+# Sale resource (developers.lightspeedhq.com) — e.g. Shopify or Hubtiger when a
+# sale was pushed in via that integration, blank for a native POS sale.
+#
+# NOTE: an earlier version of this panel queried a sale_lines.source column that
+# does not exist on Lightspeed's API (confirmed against their docs after it came
+# back empty against real data) — this is a SALE-level field, joined in below via
+# sales, not sale_lines. Was added to the sync pipeline (db.js/sync.js) alongside
+# this panel; an OLD snapshot.sqlite predating that fix won't have the column,
+# and a full `npm run sync` (not incremental) is needed once to backfill history.
+sales_cols = set(q("PRAGMA table_info(sales)")["name"])
+if "reference_number_source" not in sales_cols:
     shopify_body = (
-        '<div class="empty">sale_lines.source (Shopify / Hubtiger / native channel) is not in this '
-        'snapshot yet. Run a full <code>npm run sync</code> on the source machine — incremental syncs '
-        "won't backfill historical rows — then <code>npm run snapshot</code> and push.</div>"
+        '<div class="empty">sales.reference_number_source (Shopify / Hubtiger / native channel) is not '
+        'in this snapshot yet. Run a full <code>npm run sync</code> on the source machine — incremental '
+        "syncs won't backfill historical rows — then <code>npm run snapshot</code> and push.</div>"
     )
 else:
     shopify_summary = q1(f"""
         WITH {VALID_SALE_CTE}
         SELECT
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
-          COUNT(DISTINCT CASE WHEN UPPER(TRIM(sl.source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
+          COUNT(DISTINCT CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
           COALESCE(SUM(l.revenue), 0) AS total_revenue
-        FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
+        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
     """, params)
     shopify_gp = shopify_summary["shopify_revenue"] - shopify_summary["shopify_cogs"]
     shopify_share = (shopify_summary["shopify_revenue"] / shopify_summary["total_revenue"] * 100
@@ -1042,10 +1045,10 @@ else:
         SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
                SUM(l.revenue) AS revenue, SUM(l.revenue) - SUM(l.cogs) AS gross_profit, SUM(l.quantity) AS units
         FROM lines l
-        JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
+        JOIN sales s ON s.sale_id = l.sale_id
         LEFT JOIN items i ON i.item_id = l.item_id
         LEFT JOIN categories c ON c.category_id = i.category_id
-        WHERE UPPER(TRIM(sl.source)) = 'SHOPIFY'
+        WHERE UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY'
         GROUP BY category
         HAVING SUM(l.revenue) <> 0
         ORDER BY revenue DESC
@@ -1058,10 +1061,10 @@ else:
 
     other_channels = q(f"""
         WITH {VALID_SALE_CTE}
-        SELECT COALESCE(NULLIF(TRIM(sl.source), ''), 'Lightspeed POS') AS channel,
+        SELECT COALESCE(NULLIF(TRIM(s.reference_number_source), ''), 'Lightspeed POS') AS channel,
                SUM(l.revenue) AS revenue
-        FROM lines l JOIN sale_lines sl ON sl.sale_line_id = l.sale_line_id
-        WHERE UPPER(TRIM(COALESCE(sl.source, ''))) <> 'SHOPIFY'
+        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
+        WHERE UPPER(TRIM(COALESCE(s.reference_number_source, ''))) <> 'SHOPIFY'
         GROUP BY channel
         HAVING SUM(l.revenue) <> 0
         ORDER BY revenue DESC
