@@ -296,6 +296,13 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
    renderer, and the browser already renders this exact CSS perfectly. */
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
+  /* Browsers default to NOT printing background colors unless the user checks
+     "Background graphics" in the print dialog — an easy-to-miss, non-default
+     setting. Without it the navy header band prints as blank white, and its
+     white heading text becomes invisible against that white. This forces
+     every background (band, bar-chart fills, budget variance bars, etc.) to
+     print regardless of that toggle. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
   [data-testid="stMainMenu"], .no-print { display: none !important; }
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
