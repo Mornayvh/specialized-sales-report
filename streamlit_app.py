@@ -241,8 +241,12 @@ div[data-testid="stVerticalBlock"][data-test-scroll-behavior] {
   background: var(--bg); gap: 4px !important;
 }
 div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stElementContainer"] { margin: 0 !important; }
+/* st.columns() wraps its stHorizontalBlock in a stLayoutWrapper, which is the
+   ACTUAL direct child here — a `> [data-testid="stHorizontalBlock"]` selector
+   never matches anything, which is why this padding silently never applied to
+   a single button row (every row in this panel is st.columns-based). */
 div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stElementContainer"]:not(:first-child),
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stHorizontalBlock"] {
+div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stLayoutWrapper"] {
   padding: 0 10px !important;
 }
 div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > *:nth-child(2) { margin-top: 7px !important; }
@@ -1067,11 +1071,16 @@ with model_col:
                 # and disabled buttons are restyled via CSS to look identical to plain text.
                 clicked = row_cols[0].button(label, key=key, disabled=not clickable)
                 val_style = "font-size:13px;font-weight:700" if bold else ""
-                fill_html = "" if bold else f'<div class="fill" style="width:{width:.2f}%;background:{color}"></div>'
+                # Total has no meaningful "share of max" — it's the sum, not a data point —
+                # so no track/bar at all, not just an empty one.
+                track_html = "" if bold else (
+                    f'<div class="track" style="flex:1 1 auto">'
+                    f'<div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
+                )
                 row_cols[1].markdown(
                     f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
-                    f'<div class="track" style="flex:1 1 auto">{fill_html}</div>'
-                    f'<div class="rv" style="flex:0 0 auto;white-space:nowrap;{val_style}">{money(revenue)}</div>'
+                    f'{track_html}'
+                    f'<div class="rv" style="flex:{"1 1 auto;text-align:right" if bold else "0 0 auto"};white-space:nowrap;{val_style}">{money(revenue)}</div>'
                     f'<div class="mg" style="flex:0 0 auto;white-space:nowrap;width:40px;{val_style}">{pct(margin_of(gross_profit, revenue))}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
