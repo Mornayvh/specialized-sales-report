@@ -12,10 +12,12 @@ data.sqlite
 data.sqlite-shm
 data.sqlite-wal
 
-# Sensitive business spreadsheets (off-Lightspeed adjustments, budget targets) —
-# real financial data, not source code. Kept locally only.
-Adjustments.xlsx
-Specialized Budget Data.xlsx
+# Adjustments.xlsx and Specialized Budget Data.xlsx are DELIBERATELY committed
+# (not ignored) as of the GitHub Actions daily-sync workflow — export-snapshot.js
+# reads them straight off disk, and a cloud runner has no other way to see them.
+# This was an explicit decision (2026-09-14): real budget/adjustment figures now
+# live in this private repo's history, not just on the shop's Mac. Do not restore
+# this ignore rule without updating .github/workflows/daily-sync.yml to match.
 design/uploads/*.xlsx
 
 # The Streamlit snapshot IS meant to be committed (see export-snapshot.js) — it

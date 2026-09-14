@@ -9,7 +9,8 @@
     "sync:incremental": "node sync.js --incremental",
     "classify": "node classify-models.js",
     "snapshot": "node export-snapshot.js",
-    "refresh": "npm run sync:incremental && npm run snapshot"
+    "refresh": "npm run sync:incremental && npm run snapshot",
+    "seed-tokens": "node seed-tokens.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

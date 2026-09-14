@@ -1,0 +1,95 @@
+# Runs the full Lightspeed sync in the cloud and pushes a fresh snapshot.sqlite,
+# once a day, so the Streamlit dashboard's "Data as of" line stops being a manual
+# chore. This moves real credentials and data off the shop's Mac and into GitHub
+# Actions secrets / this repo's history — a deliberate decision made 2026-09-14,
+# not a default anyone should copy without re-making that call:
+#   - LS_CLIENT_ID / LS_CLIENT_SECRET / LS_REFRESH_TOKEN (Lightspeed API access)
+#   - Adjustments.xlsx / Specialized Budget Data.xlsx (now committed, see .gitignore)
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   LS_CLIENT_ID, LS_CLIENT_SECRET   — same values as the local .env
+#   LS_REFRESH_TOKEN                 — extract from the Mac's data.sqlite and pipe
+#                                       straight into `gh secret set`, e.g.:
+#                                         sqlite3 data.sqlite "SELECT refresh_token FROM tokens;" \
+#                                           | gh secret set LS_REFRESH_TOKEN
+#                                       Never paste this value into a chat, PR, or log.
+#   GH_PAT (optional)                — a fine-grained PAT scoped to ONLY this repo's
+#                                       "Secrets: write" permission. Lets the workflow
+#                                       write back LS_REFRESH_TOKEN if Lightspeed ever
+#                                       rotates it on refresh. Safe to skip: the sync
+#                                       just re-uses the same refresh token next time,
+#                                       which is Lightspeed's normal behaviour — this
+#                                       is a defensive fallback, not the expected path.
+#
+# This is a full sync every run (not incremental) — the runner starts from an
+# empty data.sqlite each time, so there is no watermark to increment from; see
+# sync.js's own incremental-requires-a-completed-full-sync guard. That's fine for
+# one shop's data volume, and it's simpler and more self-healing than trying to
+# cache data.sqlite between runs.
+
+name: Daily Lightspeed sync
+
+on:
+  schedule:
+    # 18:00 UTC = 20:00 SAST (Paarl, no DST) — after trading hours. Adjust to taste;
+    # cron is always UTC regardless of where the runner physically executes.
+    - cron: '0 18 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HAS_GH_PAT: ${{ secrets.GH_PAT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed OAuth session from the stored refresh token
+        env:
+          LS_CLIENT_ID: ${{ secrets.LS_CLIENT_ID }}
+          LS_CLIENT_SECRET: ${{ secrets.LS_CLIENT_SECRET }}
+          LS_REFRESH_TOKEN: ${{ secrets.LS_REFRESH_TOKEN }}
+        run: npm run seed-tokens
+
+      - name: Full sync from Lightspeed
+        env:
+          LS_CLIENT_ID: ${{ secrets.LS_CLIENT_ID }}
+          LS_CLIENT_SECRET: ${{ secrets.LS_CLIENT_SECRET }}
+        run: npm run sync
+
+      - name: Rebuild bike model classification
+        run: npm run classify
+
+      - name: Export snapshot.sqlite
+        run: npm run snapshot
+
+      - name: Commit and push snapshot.sqlite
+        run: |
+          git config user.name "sales-report-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add snapshot.sqlite
+          if git diff --cached --quiet; then
+            echo "No changes to snapshot.sqlite"
+          else
+            git commit -m "Automated daily snapshot refresh"
+          fi
+          git push
+
+      # Only runs if GH_PAT is configured — see the header comment. Never echoes
+      # the token; it goes straight from sqlite into `gh secret set`'s stdin.
+      - name: Write back refresh token if it rotated
+        if: env.HAS_GH_PAT == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: node print-refresh-token.js | gh secret set LS_REFRESH_TOKEN --repo ${{ github.repository }}
