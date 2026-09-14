@@ -306,6 +306,13 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
   [data-testid="stMainMenu"], .no-print { display: none !important; }
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
+  /* var(--bg) (#f2f2f3) is a deliberate very-light-grey card colour on screen —
+     forcing exact colour printing (above) means it now actually prints as that
+     grey instead of defaulting to white, and some print pipelines render that
+     subtle grey with a warm/beige cast. Force pure white for print specifically
+     so panels match the crisp white the dashboard reads as on screen. */
+  [data-testid="stMainBlockContainer"], .frame, .kpis .frame,
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { background: #fff !important; }
   [data-testid="stMainBlockContainer"] {
     box-shadow: none !important; margin: 0 !important; max-width: 100% !important;
     padding: 6px 10px 4px !important;
