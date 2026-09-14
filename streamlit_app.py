@@ -303,6 +303,26 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
      every background (band, bar-chart fills, budget variance bars, etc.) to
      print regardless of that toggle. */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  /* THE root cause of the "white shade over the whole page" + missing header
+     band in REAL print (Ctrl+P / the Export button), which page.pdf()-based
+     tests kept tolerating: Streamlit's own print stylesheet resets .stApp to
+     static, but leaves stAppViewContainer `position:absolute; inset:0` and
+     stMain at a fixed viewport height. Result: the printed document's BODY has
+     zero height (measured: scrollHeight 0) and the entire dashboard lives
+     inside an absolutely-positioned, viewport-sized, white-backgrounded box.
+     Chrome's print fragmentation handles that badly — the white layer washes
+     over content and the top-of-document band clips away. Making the whole
+     scaffold static/auto-height gives print a normally-flowing document
+     (body scrollHeight becomes the real content height) so fragmentation,
+     backgrounds, and page breaks all behave. */
+  .stApp, [data-testid="stAppViewContainer"], section.stMain {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
   [data-testid="stMainMenu"], .no-print { display: none !important; }
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
