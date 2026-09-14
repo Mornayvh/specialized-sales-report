@@ -107,6 +107,13 @@ p, span, div, td, th, label { color: var(--text); }
 .kick { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--acc-300); }
 .bandnum { font-family: "Barlow Condensed", sans-serif; font-size: 17px; font-variant-numeric: tabular-nums; color: #fff; }
 .bandsub { font-size: 10px; color: var(--acc-300); font-variant-numeric: tabular-nums; }
+.pdf-btn {
+  font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 11px;
+  letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 14px;
+  border: 1px solid var(--acc-400); border-radius: 0; background: var(--acc-400);
+  color: var(--acc-900); cursor: pointer;
+}
+.pdf-btn:hover { background: #fff; border-color: #fff; }
 
 .p2head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 22px 0 6px; margin-bottom: 4px; }
 .p2head h2 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
@@ -234,6 +241,22 @@ div[data-testid="stTextInputRootElement"] {
 }
 div[data-testid="stTextInputRootElement"]:focus-within { border-color: var(--acc-700) !important; }
 div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 14px !important; }
+
+/* ---------- print / Export to PDF ----------
+   The button calls window.print() — pure client-side, no server round trip —
+   and the browser's own "Save as PDF" print destination does the actual export.
+   A server-rendered PDF was deliberately not built: Streamlit Community Cloud's
+   free tier has no reliable way to run a headless-Chromium or Cairo/Pango PDF
+   renderer, and the browser already renders this exact CSS perfectly. */
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
+  [data-testid="stMainMenu"], .pdf-btn, .no-print { display: none !important; }
+  .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
+  [data-testid="stMainBlockContainer"] { box-shadow: none !important; margin: 0 !important; max-width: 100% !important; }
+  .frame, .kpis .frame { break-inside: avoid; }
+  .p2head { break-before: page; }
+}
 </style>
 """
 st.markdown(STYLE, unsafe_allow_html=True)
@@ -641,10 +664,13 @@ st.markdown(
         <h1>Sales Dashboard</h1>
         <div class="bandsub">{esc(preset)} &middot; {esc(period_text)} &middot; ZAR, ex-VAT and net of discounts</div>
       </div>
-      <div style="text-align:right">
-        <div class="kick">Revenue &middot; gross profit &middot; margin</div>
-        <div class="bandnum">{zar(kpis['revenue'])} &middot; {zar(gp)} &middot; {pct(margin)}</div>
-        <div class="bandsub">{sync_caption}</div>
+      <div style="display:flex; gap:20px; align-items:flex-end">
+        <div style="text-align:right">
+          <div class="kick">Revenue &middot; gross profit &middot; margin</div>
+          <div class="bandnum">{zar(kpis['revenue'])} &middot; {zar(gp)} &middot; {pct(margin)}</div>
+          <div class="bandsub">{sync_caption}</div>
+        </div>
+        <button class="pdf-btn" onclick="window.print()">Export to PDF</button>
       </div>
     </div>''',
     unsafe_allow_html=True,
