@@ -257,13 +257,67 @@ div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 
    free tier has no reliable way to run a headless-Chromium or Cairo/Pango PDF
    renderer, and the browser already renders this exact CSS perfectly. */
 @media print {
-  @page { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 landscape; margin: 8mm; }
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
   [data-testid="stMainMenu"], .no-print { display: none !important; }
   .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
-  [data-testid="stMainBlockContainer"] { box-shadow: none !important; margin: 0 !important; max-width: 100% !important; }
-  .frame, .kpis .frame { break-inside: avoid; }
-  .p2head { break-before: page; }
+  [data-testid="stMainBlockContainer"] {
+    box-shadow: none !important; margin: 0 !important; max-width: 100% !important;
+    padding: 6px 10px 4px !important;
+  }
+  /* Screen sizing (readability on a monitor) is deliberately roomier than print
+     needs — the original two-page print design this mirrors ran ~9-11px type
+     throughout. Everything below tightens back toward that so the SAME content
+     (same row limits, same panels) fits two landscape pages instead of four. */
+  .band { margin: -6px -10px 6px !important; padding: 8px 14px 9px !important; }
+  .band h1 { font-size: 23px !important; margin: 2px 0 !important; }
+  .kick { font-size: 8px !important; }
+  .bandsub { font-size: 9px !important; }
+  .bandnum { font-size: 14px !important; }
+  .kpis { gap: 6px !important; margin-bottom: 3px !important; }
+  .kpis .frame { padding: 4px 8px 4px !important; }
+  .kpis .v, .kpis .frame:first-child .v { font-size: 15px !important; }
+  .k { font-size: 8px !important; }
+  .v { font-size: 13px !important; }
+  .f { font-size: 8px !important; margin-top: 0 !important; line-height: 1.2 !important; }
+  .two { gap: 4px !important; }
+  .frame { margin-bottom: 1px !important; }
+  div[data-testid="stElementContainer"]:has(.note) { margin-bottom: 0 !important; }
+  .brow, table.dt tr, .stat { break-inside: avoid; }
+  .ph { padding: 1px 7px 1px !important; }
+  .pb { padding: 2px 7px 3px !important; }
+  .meta { font-size: 7.5px !important; }
+  .stats { margin-bottom: 2px !important; }
+  .stat { padding: 0 9px !important; }
+  .stat .v { font-size: 11px !important; line-height: 1.15 !important; }
+  table.dt { font-size: 8.5px !important; }
+  table.dt th { padding: 1px 4px !important; line-height: 1.1 !important; }
+  table.dt td { padding: 0.5px 4px !important; line-height: 1.15 !important; }
+  .brow { grid-template-columns: 100px 1fr 70px 38px !important; padding: 0 !important; }
+  .brow .nm, .brow .rv, .brow .mg, .nm, .rv, .mg { font-size: 8.5px !important; line-height: 1.15 !important; }
+  .brow.total .nm, .brow.total .rv, .brow.total .mg { font-size: 9.5px !important; }
+  .brow.total { margin-top: 1px !important; padding: 1px 0 !important; }
+  .track, .fill { height: 5px !important; }
+  .note { font-size: 8px !important; line-height: 1.2 !important; }
+  .empty { padding: 3px 0 !important; }
+  [data-testid="stHorizontalBlock"] { margin-bottom: 0 !important; gap: 7px !important; }
+  [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { gap: 0 !important; }
+  /* The Bike sales by model drill-down uses native st.button/st.columns rows
+     (inline-styled, not the .brow class the other bar lists use), so none of
+     the .brow rules above touch it — it needs its own print shrink. */
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stHorizontalBlock"] { gap: 4px !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[style*="padding:3px 0"] { padding: 0 !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button {
+    font-size: 8.5px !important; line-height: 1.15 !important; padding: 0 !important; min-height: 0 !important;
+  }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button p { font-size: 8.5px !important; }
+  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .rv, div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .mg {
+    font-size: 8.5px !important;
+  }
+  .p2head { break-before: page; padding: 0 0 3px !important; margin-bottom: 3px !important; }
+  .p2head h2 { font-size: 15px !important; }
+  footer.notes { margin-top: 4px !important; padding-top: 4px !important; gap: 10px !important; }
 }
 </style>
 """
@@ -928,22 +982,41 @@ with model_col:
                       for _, r in model_df.iterrows()]
 
         if model_rows and level != "size":
-            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=10)
+            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
             max_rev = max([r["revenue"] for r in shown_m] + [1])
+            total_html = (
+                f'<div class="brow total"><div class="nm">Total</div><div></div>'
+                f'<div class="rv">{money(tot_rev_m)}</div><div class="mg">{pct(margin_of(tot_gp_m, tot_rev_m))}</div></div>'
+            )
             for i, r in enumerate(shown_m):
                 is_other = r["label"].startswith("OTHER (")
-                row_cols = st.columns([1, 2], gap="small")
-                if is_other:
-                    row_cols[0].markdown(f'<div class="nm" style="padding:3px 0">{esc(r["label"])}</div>', unsafe_allow_html=True)
-                else:
-                    if row_cols[0].button(r["label"], key=f"drill_{level}_{i}_{r['label']}"):
-                        if level == "model":
-                            st.session_state.drill_model = r["label"]
-                        else:
-                            st.session_state.drill_trim = r["label"]
-                        st.rerun()
                 width = max(0.0, r["revenue"] / max_rev * 100) if max_rev else 0.0
                 color = "var(--acc-800)" if i == 0 else ("var(--acc-600)" if i < 3 else "var(--acc-400)")
+                if is_other:
+                    # Plain .brow markup, not st.columns — this row has no button. Combined
+                    # into ONE markdown call with the Total row right below (rather than
+                    # two separate st.markdown/element-container calls): Streamlit's own
+                    # flex layout between two adjacent but separately-rendered containers
+                    # here, one with a button-based sibling above it and one without,
+                    # rendered them overlapping under a narrower width (e.g. a print page).
+                    # Keeping them in one container sidesteps that entirely.
+                    st.markdown(
+                        f'<div class="brow"><div class="nm">{esc(r["label"])}</div>'
+                        f'<div class="track"><div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
+                        f'<div class="rv">{money(r["revenue"])}</div>'
+                        f'<div class="mg">{pct(margin_of(r["gross_profit"], r["revenue"]))}</div></div>'
+                        + total_html,
+                        unsafe_allow_html=True,
+                    )
+                    total_html = None
+                    continue
+                row_cols = st.columns([1, 2], gap="small")
+                if row_cols[0].button(r["label"], key=f"drill_{level}_{i}_{r['label']}"):
+                    if level == "model":
+                        st.session_state.drill_model = r["label"]
+                    else:
+                        st.session_state.drill_trim = r["label"]
+                    st.rerun()
                 row_cols[1].markdown(
                     f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
                     f'<div class="track" style="flex:1 1 auto"><div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
@@ -952,13 +1025,10 @@ with model_col:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-            st.markdown(
-                f'<div class="brow total"><div class="nm">Total</div><div></div>'
-                f'<div class="rv">{money(tot_rev_m)}</div><div class="mg">{pct(margin_of(tot_gp_m, tot_rev_m))}</div></div>',
-                unsafe_allow_html=True,
-            )
+            if total_html is not None:
+                st.markdown(total_html, unsafe_allow_html=True)
         else:
-            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=10)
+            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
             st.markdown(bars_html(shown_m, tot_rev_m, tot_gp_m, empty_text="No bike sales in this period."),
                         unsafe_allow_html=True)
 
