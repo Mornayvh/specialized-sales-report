@@ -209,7 +209,8 @@ h1, h2, h3 { font-family: var(--font-heading); }
   font-family: var(--font-heading); font-size: 27px; line-height: 1.05;
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 4px;
 }
-.kpi .f { font-size: 11px; color: var(--color-neutral-700); margin-top: 3px; }
+.kpi .f { font-size: 11px; color: var(--color-neutral-700); margin-top: 3px; line-height: 1.25; }
+.kpi .f + .f { margin-top: 1px; }
 
 /* ---------- section header ---------- */
 .sh {
@@ -705,13 +706,18 @@ def kpi_strip(cells):
     """
     out = []
     for c in cells:
-        foot = []
+        # Caption and comparison sit on their own lines rather than being joined
+        # with a separator. Joined, the line wraps at whatever point the cell
+        # width happens to fall — leaving "vs SPLY" orphaned on line three in
+        # some cells and not others, so the four figures no longer sit on a
+        # common baseline. One line each keeps the strip a predictable height.
+        foot_html = ""
         if c.get("foot"):
-            foot.append(esc(c["foot"]))
+            foot_html += f'<div class="f">{esc(c["foot"])}</div>'
         if c.get("delta"):
-            text, color = c["delta"]
-            foot.append(f'<span style="color:{color}">{esc(text)}</span>')
-        foot_html = f'<div class="f">{" · ".join(foot)}</div>' if foot else ""
+            text, colour = c["delta"]
+            foot_html += f'<div class="f" style="color:{colour}">{esc(text)}</div>'
+
         out.append(f'<div class="kpi"><div class="k">{esc(c["label"])}</div>'
                    f'<div class="v">{esc(c["value"])}</div>{foot_html}</div>')
     return f'<div class="kpis">{"".join(out)}</div>'
@@ -946,7 +952,12 @@ PRESETS = {
 
 today = dt.date.today()
 if "preset" not in st.session_state:
-    st.session_state.preset = "All time"
+    # The report opens on the current financial year, not on all time. The
+    # design defaulted to All time, but this is a periodic report about how
+    # the shop is trading now — an all-time total is a reference figure, not
+    # the headline, and it flattens any recent movement against five years of
+    # history. Every preset, All time included, is one click away.
+    st.session_state.preset = "Financial YTD"
 if "filter_open" not in st.session_state:
     st.session_state.filter_open = False   # collapsed by default, per the design
 
