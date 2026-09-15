@@ -35,6 +35,7 @@ own component internals allow.
 """
 import base64
 import html as html_lib
+import re
 import hmac
 import sqlite3
 import datetime as dt
@@ -79,7 +80,7 @@ def logo_data_uri():
 
 
 def logo_img():
-    """The band's right-hand mark, or nothing at all if logo.png is missing."""
+    """The header band's mark, or nothing at all if logo.png is missing."""
     uri = logo_data_uri()
     return f'<img class="bandlogo" src="{uri}" alt="Specialized">' if uri else ""
 
@@ -89,398 +90,429 @@ def logo_img():
 # Ported from index.html's :root palette and component classes 1:1 (same
 # variable names, same values) so the two front ends stay in visual lockstep.
 STYLE = """
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap');
+/* =====================================================================
+   Industry design system — tokens lifted verbatim from the design handoff
+   (_ds/industry-f4244d10-4d03-48f0-9b01-e3b721af52d8/styles.css).
+   Square corners and no shadows anywhere: no border-radius is used in this
+   design at all, and the only shadow on the page is the screen-only one
+   separating sheets from the ground behind them.
+   ===================================================================== */
 :root {
-  --bg:        #f2f2f3;
-  --text:      #1d1f20;
-  --muted:     #5d5d60;
-  --muted-2:   #7a7a7d;
-  --divider:   rgba(29,31,32,0.16);
-  --rule:      #b7b7ba;
-  --hair:      rgba(29,31,32,0.07);
-  --track:     #e7e7ea;
-  --acc:       #5980a6;
-  --acc-300:   #b5cbe0;
-  --acc-400:   #94bce3;
-  --acc-600:   #4b7099;
-  --acc-700:   #416180;
-  --acc-800:   #34506b;
-  --acc-900:   #1d2d3d;
-  --clay:      #8c1f34;
+  --color-bg:          #f2f2f3;
+  --color-text:        #1d1f20;
+  --color-divider:     color-mix(in srgb, #1d1f20 16%, transparent);
+  --color-neutral-200: #e7e7ea;
+  --color-neutral-300: #d4d4d7;
+  --color-neutral-400: #b7b7ba;
+  --color-neutral-500: #98989b;
+  --color-neutral-600: #7a7a7d;
+  --color-neutral-700: #5d5d60;
+  --color-accent-300:  #b5d9fd;
+  --color-accent-400:  #94bce3;
+  --color-accent-600:  #597ea3;
+  --color-accent-700:  #416180;
+  --color-accent-800:  #2c455d;
+  --color-accent-900:  #1d2d3d;
+  /* Clay. The design hard-codes this rather than tokenising it, because it
+     carries meaning rather than style: unfavourable values ONLY (negative
+     variance, discount leakage, aged stock). Never decorative. */
+  --clay:              #8c1f34;
+  --font-heading:      "Barlow Condensed", system-ui, sans-serif;
+  --font-body:         "Barlow", system-ui, sans-serif;
 }
-html, body, [class*="css"] { font-family: "Barlow", system-ui, -apple-system, sans-serif; }
-.stApp { background: #d9d9dc; }
-[data-testid="stAppViewContainer"] { background: #d9d9dc; }
+
+/* ---------- Streamlit scaffold, flattened to a plain document ground ----------
+   The app is no longer a Streamlit page with a content column; it is a stack
+   of fixed A4 sheets centred on a ground. Everything Streamlit puts around
+   that is neutralised here. */
+html, body, [class*="css"] { font-family: var(--font-body); }
+.stApp, [data-testid="stAppViewContainer"] { background: #d9d9dc; }
 [data-testid="stHeader"] { background: transparent; }
+[data-testid="stSidebar"] { display: none !important; }
 [data-testid="stMainBlockContainer"] {
-  max-width: 1120px; margin: 18px auto 36px; padding: 22px 28px 28px;
-  background: var(--bg); color: var(--text);
-  box-shadow: 0 2px 14px rgba(0,0,0,0.16);
+  max-width: none; width: 100%; padding: 16px 0 40px; background: transparent;
 }
-h1, h2, h3 { font-family: "Barlow Condensed", system-ui, sans-serif; }
-p, span, div, td, th, label { color: var(--text); }
+h1, h2, h3 { font-family: var(--font-heading); }
+/* Streamlit pads its headings generously for a scrolling app. Inside a fixed
+   page box that padding is dead space the design never budgeted for — it made
+   the page-1 band 36px taller than specified on its own. */
+.sheet h1, .sheet h2, .sheet h3, .sheet h4 { padding: 0; font-weight: 600; }
+.sheet p { margin: 0; }
 
-/* ---------- header band ---------- */
+/* =====================================================================
+   The document — a stack of fixed A4 portrait sheets.
+   794 x 1123px is 210 x 297mm at 96dpi, the same physical box doc-page.js
+   pins in the prototype, expressed in the units the screen lays out in.
+   overflow:hidden is load-bearing rather than defensive: a section that
+   outgrows its sheet must be visibly clipped during review, not silently
+   reflowed onto a sheet that does not exist in print.
+   ===================================================================== */
+.sheet {
+  width: 794px; height: 1123px; overflow: hidden;
+  margin: 0 auto 20px;
+  background: var(--color-bg); color: var(--color-text);
+  font-family: var(--font-body);
+  /* Streamlit's global line-height is 1.6. The design is measured against the
+     browser default, so inheriting 1.6 inflates every table row and bar row by
+     roughly a third and pushes each sheet past its own page box. */
+  line-height: normal;
+  display: flex; flex-direction: column;
+  /* Screen-only separation from the ground. Removed in print, where the
+     sheet edge IS the paper edge. */
+  box-shadow: 0 1px 10px rgba(29,31,32,0.18);
+}
+/* Page 1 is full-bleed at the top (the band runs edge to edge), so the sheet
+   itself carries no top or side padding — the inner wrapper does. */
+.sheet.s1 { padding: 0 0 26px; gap: 20px; }
+.sheet.s1 .inner { padding: 0 40px; display: flex; flex-direction: column; gap: 20px; }
+.sheet.sn { padding: 30px 40px 20px; gap: 22px; }
+
+/* ---------- header band (page 1, full bleed) ---------- */
 .band {
-  background: var(--acc-900); color: #f5f5f8;
-  margin: -22px -28px 18px; padding: 14px 28px 15px;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  background: var(--color-accent-900); color: #fff;
+  padding: 20px 40px 22px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
 }
-.band h1 { font-size: 34px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; margin: 4px 0 2px; color: #fff !important; }
+.band h1 {
+  font-family: var(--font-heading); font-size: 38px; line-height: 1;
+  letter-spacing: -0.02em; margin: 6px 0 5px; color: #fff !important; font-weight: 600;
+}
 /* Streamlit wraps markdown headings in an auto-generated inner <span> for its
-   anchor-link feature; that span is an unstyled type selector match for the
-   `span { color: var(--text) }` rule below, which otherwise wins over the
-   inherited white since inheritance always loses to any direct rule. */
+   anchor-link feature; that span is a type-selector match for any bare
+   `span` rule, which would otherwise beat the inherited white. */
 .band h1 span { color: #fff !important; }
-.kick { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--acc-300); }
-.bandsub { font-size: 10px; color: var(--acc-300); font-variant-numeric: tabular-nums; }
-/* The mark is white-on-transparent, so it sits straight on the navy with no
-   plate behind it. flex:none stops the flex row from squeezing it when the
-   heading block is wide; align-self centres it against that block, which is
-   taller than the mark and would otherwise bottom-align it (.band is flex-end). */
-.bandlogo { height: 64px; width: auto; flex: none; align-self: center; }
-/* Export to PDF — a real st.button, scoped via the marker-adjacency trick (same
-   technique as the preset/kind radios above) so it gets a pill look instead of
-   the plain-text-link style every other st.button on this page uses. */
-div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button {
-  font-family: "Barlow Condensed", sans-serif !important; font-weight: 600; font-size: 11px !important;
-  letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 14px !important;
-  border: 1px solid var(--acc-400) !important; border-radius: 0 !important; background: var(--acc-400) !important;
-  color: var(--acc-900) !important; text-decoration: none !important; cursor: pointer;
+.band .eyebrow { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--color-accent-300); }
+.band .period  { font-size: 11.5px; color: var(--color-accent-300); }
+.bandright { display: flex; align-items: center; gap: 22px; flex: none; }
+.bandright .txt { text-align: right; }
+.bandright .synced {
+  font-family: var(--font-heading); font-size: 15px; margin-top: 4px;
+  font-variant-numeric: tabular-nums; color: #fff;
 }
-div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button:hover {
-  background: #fff !important; border-color: var(--acc-900) !important;
+.bandright .counts { font-size: 11px; color: var(--color-accent-300); font-variant-numeric: tabular-nums; }
+/* The mark is white on transparency, so it sits straight on the band. */
+.bandlogo { width: 66px; height: 66px; display: block; flex: none; }
+
+/* ---------- KPI strip (page 1) ---------- */
+.kpis {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+  border-top: 1px solid var(--color-neutral-500);
+  border-bottom: 1px solid var(--color-neutral-500);
+  padding: 12px 0 13px;
 }
-div[data-testid="stElementContainer"]:has(.marker-pdfbtn) + div[data-testid="stElementContainer"] div[data-testid="stButton"] button p {
-  font-size: 11px !important;
+.kpi { padding: 0 16px; }
+.kpi + .kpi { border-left: 1px solid var(--color-divider); }
+.kpi .k { font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--color-accent-700); }
+.kpi .v {
+  font-family: var(--font-heading); font-size: 27px; line-height: 1.05;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 4px;
 }
+.kpi .f { font-size: 11px; color: var(--color-neutral-700); margin-top: 3px; }
 
-.p2head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 22px 0 6px; margin-bottom: 4px; }
-.p2head h2 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+/* ---------- section header ---------- */
+.sh {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--color-neutral-500);
+}
+.sh h2, .sh h3 {
+  font-family: var(--font-heading); font-size: 19px; margin: 0;
+  letter-spacing: 0.01em; font-weight: 600;
+}
+.sh .eyebrow { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); }
+/* Per-section rhythm: the design tunes these individually rather than using
+   one value, so the variants are named for the section they belong to. */
+.sh.tight  { padding-bottom: 4px; margin-bottom: 6px; }
+.sh.normal { padding-bottom: 4px; margin-bottom: 8px; }
+.sh.loose  { padding-bottom: 5px; margin-bottom: 10px; }
+.sh.sub    { padding-bottom: 5px; margin-bottom: 6px; }
 
-.frame { border: 1px solid var(--divider); background: var(--bg); margin-bottom: 18px; }
-.ph { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; padding: 7px 10px 6px; border-bottom: 1px solid var(--divider); }
-.ph h3 { font-size: 14px; font-weight: 600; line-height: 1.1; margin: 0; letter-spacing: 0.01em; }
-.meta { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.pb { padding: 8px 10px 9px; }
-.k { font-size: 9.5px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--acc-700); }
-.v { font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 20px; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.f { font-size: 10px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.note { font-size: 11px; line-height: 1.5; color: var(--muted); }
-.empty { color: var(--muted-2); font-size: 11px; padding: 14px 0; text-align: center; }
+/* ---------- page header (pages 2+) ----------
+   A 2px rule, deliberately heavier than the 1px section rules. */
+.ph2 {
+  display: flex; align-items: baseline; justify-content: space-between;
+  border-bottom: 2px solid var(--color-accent-900); padding-bottom: 7px;
+}
+.ph2 h2 { font-family: var(--font-heading); font-size: 26px; margin: 0; letter-spacing: -0.01em; font-weight: 600; }
+.ph2 .eyebrow { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); }
 
-.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; margin-bottom: 12px; }
-.kpis .frame { padding: 9px 11px 10px; }
-.kpis .v { font-size: 20px; }
-.kpis .frame:first-child .v { font-size: 22px; }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+/* ---------- bar rows ----------
+   Two densities: page 1 is the compact grid, pages 2+ the roomy one. Bar
+   width is value / max(value), proportional to the largest row rather than
+   to the total, so the leader always reaches the full track. */
+.brow { display: grid; align-items: center; }
+.sheet.s1 .brow { grid-template-columns: 130px 1fr 96px 58px; gap: 12px; padding: 3px 0; }
+.sheet.sn .brow { grid-template-columns: 150px 1fr 108px 64px; gap: 14px; padding: 6px 0; }
+.sheet.s1 .brow .nm, .sheet.s1 .brow .rv, .sheet.s1 .brow .mg { font-size: 12.5px; }
+.sheet.sn .brow .nm, .sheet.sn .brow .rv, .sheet.sn .brow .mg { font-size: 14px; }
+.brow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .rv, .brow .mg { text-align: right; font-variant-numeric: tabular-nums; }
+.brow .mg { color: var(--color-neutral-700); }
+.track { background: var(--color-neutral-200); }
+.sheet.s1 .track, .sheet.s1 .fill { height: 12px; }
+.sheet.sn .track, .sheet.sn .fill { height: 14px; }
 
-.stats { display: flex; margin-bottom: 7px; flex-wrap: wrap; }
-.stat { padding: 0 12px; border-left: 1px solid var(--divider); }
-.stat:first-child { border-left: 0; padding-left: 0; }
-.stat .v { font-size: 15px; }
+.brow.total { border-top: 1px solid var(--color-neutral-500); font-weight: 600; }
+.sheet.s1 .brow.total { padding: 5px 0 0; margin-top: 3px; }
+.sheet.sn .brow.total { padding: 8px 0 0; margin-top: 4px; }
+.brow.total .nm { font-family: var(--font-heading); letter-spacing: 0.07em; text-transform: uppercase; }
+.sheet.s1 .brow.total .nm { font-size: 13px; }
+.sheet.sn .brow.total .nm { font-size: 14px; }
+.brow.total .mg { color: var(--color-text); }
 
-table.dt { width: 100%; border-collapse: collapse; font-size: 11px; }
+/* ---------- tables ---------- */
+table.dt { width: 100%; border-collapse: collapse; }
+.sheet.s1 table.dt { font-size: 12.5px; }
+.sheet.sn table.dt { font-size: 14px; }
+/* Streamlit's base stylesheet puts a 1px border on all four sides of every
+   table cell. The design rules rows with a bottom border only, so the side
+   borders have to be cleared explicitly — left alone they draw column rules
+   the design does not have AND add a pixel of height to every row, which is
+   enough on its own to push page 1 past its page box. */
+table.dt th, table.dt td { border: 0; }
 table.dt th {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 9.5px;
-  letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
-  padding: 3px 5px; border-bottom: 1px solid var(--rule); white-space: nowrap; text-align: right;
+  font-family: var(--font-heading); font-weight: 600; font-size: 10.5px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600);
+  padding: 4px 6px; border-bottom: 1px solid var(--color-neutral-500); text-align: right;
 }
-table.dt th:first-child, table.dt td:first-child { text-align: left; }
-table.dt td { padding: 2.6px 5px; border-bottom: 1px solid var(--hair); font-variant-numeric: tabular-nums; text-align: right; }
-table.dt tbody tr:last-child td { border-bottom: 0; }
-td.name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: normal; }
-td.rank { color: var(--muted-2); font-family: "Barlow Condensed", sans-serif; width: 18px; }
-
-/* Base sizing for bar-row value/margin text — NOT scoped to .brow, since the
-   drill-down panel builds these divs outside a .brow wrapper (Streamlit
-   columns) and must still match every other panel's 11px figures exactly. */
-.nm, .rv, .mg { font-size: 11px; font-variant-numeric: tabular-nums; }
-.rv, .mg { text-align: right; }
-.mg { color: var(--muted); }
-.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.brow { display: grid; grid-template-columns: 130px 1fr 90px 50px; gap: 8px; align-items: center; padding: 2px 0; }
-.brow.total { margin-top: 8px; padding: 8px 0 2px; border-top: 1.5px solid var(--rule); }
-.brow.total .nm, .brow.total .rv, .brow.total .mg { font-size: 13px; font-weight: 700; }
-.brow.total .nm { font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
-.brow.total .mg { color: var(--text); }
-.track { background: var(--track); height: 9px; }
-.fill { height: 9px; background: var(--acc-400); }
-
-.crumbs { font-size: 10px; color: var(--muted-2); }
-.crumbs .cur { font-weight: 700; color: var(--text); }
-
-footer.notes { border-top: 1px solid var(--divider); padding-top: 10px; margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-/* ---------- sidebar, restyled to match aside.filters ---------- */
-section[data-testid="stSidebar"] { background: var(--bg); border-right: 1px solid var(--divider); }
-/* :not(...) excludes Streamlit's icon glyphs (e.g. the sidebar-collapse arrow) —
-   those render a literal word like "keyboard_double_arrow_left" as text, mapped
-   to an arrow glyph ONLY by their own icon font; forcing Barlow on them via a
-   blanket `*` rule broke that and showed the raw word instead of the icon. */
-section[data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) { font-family: "Barlow", system-ui, sans-serif; color: var(--text); }
-section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
-  font-family: "Barlow Condensed", sans-serif; text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px;
+/* Alignment follows the column's ROLE, not its position: the Top 10 table
+   leads with a right-aligned rank before the left-aligned product name, so a
+   :first-child rule aligns the wrong column. Every builder tags its name and
+   rank cells, header included. */
+table.dt th.name, table.dt td.name { text-align: left; }
+table.dt th.rank, table.dt td.rank { text-align: right; }
+table.dt td {
+  border-bottom: 1px solid var(--color-neutral-200);
+  font-variant-numeric: tabular-nums; text-align: right;
 }
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] strong {
-  font-family: "Barlow Condensed", sans-serif; font-size: 14px; letter-spacing: 0.01em;
-}
+.sheet.s1 table.dt td { padding: 3.5px 6px; }
+.sheet.sn table.dt td { padding: 6px 6px; }
+td.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: normal; }
+.sheet.sn td.name { max-width: 300px; }
+td.rank { font-family: var(--font-heading); color: var(--color-neutral-500); width: 22px; }
+td.muted { color: var(--color-neutral-700); }
 
-/* Period preset — vertical segmented control (mirrors .segv). */
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] {
-  display: flex; flex-direction: column; border: 1px solid var(--divider); gap: 0;
+/* ---------- budget summary row + diverging variance bar ---------- */
+.bsum { display: flex; margin-bottom: 10px; }
+.bsum > div:first-child { padding-right: 22px; }
+.bsum > div + div { padding: 0 22px; border-left: 1px solid var(--color-divider); }
+.bsum .k { font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--color-accent-700); }
+.bsum .v {
+  font-family: var(--font-heading); font-size: 21px; line-height: 1.1;
+  font-variant-numeric: tabular-nums; margin-top: 2px;
 }
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label {
-  margin: 0 !important; padding: 4px 8px !important; border-bottom: 1px solid var(--divider);
-  font-family: "Barlow Condensed", sans-serif; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--muted); min-height: 0 !important;
-}
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:last-child { border-bottom: 0; }
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:hover { background: rgba(89,128,166,0.12); color: var(--acc-900); }
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:has(input:checked) { background: var(--acc-800); }
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:has(input:checked) p { color: #f4f4f6 !important; }
-div[data-testid="stElementContainer"]:has(.marker-preset) + div[data-testid="stElementContainer"] div[role="radiogroup"] label div:not([data-testid="stMarkdownContainer"]):not(:has([data-testid="stMarkdownContainer"])) { display: none !important; }
+/* The under/over cell. Fill width saturates at +/-25% variance, so a category
+   that is 80% over budget and one that is 30% over both read as "full" —
+   the number beside it carries the exact value. */
+td.vbar { width: 210px; padding: 5px 6px 5px 14px !important; }
+.vwrap { display: grid; grid-template-columns: 1fr 1fr; align-items: center; height: 10px; }
+.vneg { display: flex; justify-content: flex-end; border-right: 1px solid var(--color-neutral-400); height: 10px; }
+.vpos { display: flex; height: 10px; }
+.vneg > div, .vpos > div { height: 10px; }
+.vneg > div { background: var(--clay); }
+.vpos > div { background: var(--color-accent-600); }
+th.vbarh { text-align: center !important; padding-left: 14px !important; }
 
-/* Item-form toggle — horizontal segmented control (mirrors .segb). */
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] {
-  display: inline-flex; flex-direction: row; border: 1px solid var(--divider); width: fit-content;
+/* ---------- stat cards (operating health) ---------- */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.card { border: 1px solid var(--color-divider); padding: 10px 13px 12px; }
+.card .t {
+  font-family: var(--font-heading); font-size: 14px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--color-accent-800); margin-bottom: 7px;
 }
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] label {
-  margin: 0 !important; padding: 2px 8px !important; border-right: 1px solid var(--divider); min-height: 0 !important;
-  font-family: "Barlow Condensed", sans-serif; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
-}
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:last-child { border-right: 0; }
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:has(input:checked) { background: var(--acc-800); }
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] label:has(input:checked) p { color: #f4f4f6 !important; }
-div[data-testid="stElementContainer"]:has(.marker-kind) + div[data-testid="stElementContainer"] div[role="radiogroup"] label div:not([data-testid="stMarkdownContainer"]):not(:has([data-testid="stMarkdownContainer"])) { display: none !important; }
+.card .figrow { display: flex; align-items: baseline; gap: 8px; }
+.card .fig { font-family: var(--font-heading); font-size: 30px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.card .cap { font-size: 11px; color: var(--color-neutral-700); }
+.card .subs { margin-top: 9px; display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; }
+.card .subs > div { display: flex; justify-content: space-between; }
+.card .subs span:first-child { color: var(--color-neutral-700); }
+.card .subs span:last-child { font-variant-numeric: tabular-nums; }
 
-section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
-  border: 1px solid var(--divider); border-radius: 0; font-size: 11px; color: var(--text);
+/* ---------- methodology footer ----------
+   margin-top:auto pins it to the bottom of the sheet's flex column. */
+footer.notes {
+  margin-top: auto; border-top: 1px solid var(--color-divider); padding-top: 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  font-size: 10.5px; line-height: 1.5; color: var(--color-neutral-700);
 }
 
-/* Bordered drill-down panel — the one container(border=True) frame in the app.
-   .ph (the header) carries its own padding and sits flush against the border,
-   matching every other panel's header. Everything after it — crumbs, the
-   Complete-bikes toggle, the coverage note, each model row, the total — used to
-   rely on a `<div class="pb">` opened in one st.markdown call and closed in a
-   much later one, which does NOT actually wrap the intervening st.button/
-   st.columns calls (each st.markdown/st.button is its own independent DOM
-   fragment) — so that padding never applied at all. Fixed by padding every
-   direct child but the header via CSS instead. */
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] {
-  border: 1px solid var(--divider) !important; border-radius: 0 !important; padding: 0 !important;
-  background: var(--bg); gap: 4px !important;
-}
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stElementContainer"] { margin: 0 !important; }
-/* st.columns() wraps its stHorizontalBlock in a stLayoutWrapper, which is the
-   ACTUAL direct child here — a `> [data-testid="stHorizontalBlock"]` selector
-   never matches anything, which is why this padding silently never applied to
-   a single button row (every row in this panel is st.columns-based). */
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stElementContainer"]:not(:first-child),
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > [data-testid="stLayoutWrapper"] {
-  padding: 0 10px !important;
-}
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > *:nth-child(2) { margin-top: 7px !important; }
-div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > *:last-child { padding-bottom: 9px !important; }
+.empty { color: var(--color-neutral-600); font-size: 12px; padding: 14px 0; text-align: center; }
+.stack { display: flex; flex-direction: column; gap: 22px; }
+a { color: var(--color-accent-700); }
+a:hover { color: var(--color-accent-900); }
 
-/* Drill / crumb buttons rendered as plain text links, matching .brow .drill and .crumbs button. */
-div[data-testid="stButton"] button {
-  background: none !important; border: 0 !important; padding: 0 !important; box-shadow: none !important;
-  color: var(--acc-700) !important; font-family: "Barlow", sans-serif; font-size: 11px !important;
-  text-decoration: underline; text-underline-offset: 2px; text-align: left !important; min-height: 0 !important;
+/* =====================================================================
+   Screen chrome — the control bars above the document. Never printed.
+
+   Both bars are st.container()s, because they hold real Streamlit widgets and
+   a widget cannot live inside markup emitted by st.markdown. Each container is
+   addressed through an invisible marker span it contains: the :has() selector
+   below matches the ONE stVerticalBlock whose own direct element-container
+   holds that marker, which is what keeps it from also matching every
+   ancestor block up to the page root.
+   ===================================================================== */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-ctrlbar),
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-drillbar) {
+  max-width: 794px; margin: 0 auto 14px; background: #fff;
+  border: 1px solid var(--color-divider); padding: 10px 14px;
+  font-family: var(--font-body); gap: 8px !important;
 }
-div[data-testid="stButton"] button:hover { color: var(--acc-900) !important; }
-/* Streamlit wraps button text in a <p>, which carries the browser's default
-   paragraph margin (~1em top/bottom) — invisible on a normal button because the
-   button's own padding usually dwarfs it, but here padding is zeroed for a
-   compact row, so that default margin was the actual floor on row height. */
-div[data-testid="stButton"] button p { font-size: 11px !important; margin: 0 !important; }
-/* OTHER/Total "buttons" are disabled — real buttons only for layout consistency
-   (see render_row) — restyle them to read as plain row labels, not greyed links. */
-div[data-testid="stButton"] button:disabled {
-  color: var(--text) !important; text-decoration: none !important; cursor: default !important; opacity: 1 !important;
+.lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); }
+.cur { font-family: var(--font-heading); font-size: 16px; color: var(--color-accent-900); line-height: 1.25; }
+.crumb { font-family: var(--font-heading); font-size: 16px; color: var(--color-accent-900); line-height: 1.25; }
+.ctrlrule { border-top: 1px solid var(--color-divider); margin: 4px -14px 8px; }
+.ctrlnote { font-size: 11px; color: var(--color-neutral-700); line-height: 1.45; }
+/* The coverage caveat under the attach table, at the design's footnote scale. */
+.note { font-size: 10.5px; line-height: 1.5; color: var(--color-neutral-700); margin-top: 8px; }
+
+/* Streamlit's own widgets, dragged into the design's visual language. Each
+   block is scoped by marker adjacency: an invisible <span> marker is emitted
+   immediately before the widget, and the rule targets the element container
+   that FOLLOWS the one holding the marker. Streamlit gives its widgets no
+   stable class of their own, so this is the only way to style one widget
+   without styling every widget on the page. */
+div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"],
+div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] [role="radiogroup"] {
+  display: flex !important; gap: 7px !important; flex-wrap: wrap;
 }
-/* The Total row's button — found via the marker-adjacency trick (:last-of-type
-   doesn't work here: st.columns wraps each row in its own stLayoutWrapper, so
-   every row's lone stHorizontalBlock trivially IS "the last of its type" within
-   that one-child wrapper — it matched EVERY row, not just the last one). */
-div[data-testid="stElementContainer"]:has(.marker-total-row) + div[data-testid="stLayoutWrapper"] button:disabled {
-  font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.06em; font-size: 13px !important;
+div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button,
+div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button {
+  border-radius: 0 !important; padding: 7px 12px !important; min-height: 0 !important;
+  background: #fff !important; border: 1px solid var(--color-neutral-400) !important;
+  font-family: var(--font-body) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button p,
+div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button p {
+  font-size: 12px !important; color: var(--color-accent-800) !important; line-height: 1.1;
+}
+div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"],
+div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] {
+  background: var(--color-accent-800) !important; border-color: var(--color-accent-800) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] p,
+div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] p {
+  color: #fff !important;
 }
 
-[data-testid="stHorizontalBlock"] { gap: 11px !important; margin-bottom: 6px; }
-[data-testid="stDataFrame"] { font-family: "Barlow", sans-serif; }
-
-/* ---------- access-code box on the login page ---------- */
-div[data-testid="stTextInputRootElement"] {
-  border: 1.5px solid var(--rule) !important; border-radius: 0 !important; background: #fff !important;
-  box-shadow: none !important;
+/* Print to PDF is the filled button; the two outlined ones are Change period
+   and Back to all models. */
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button,
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button {
+  font-family: var(--font-body) !important; font-size: 11px !important; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 8px 12px !important; border-radius: 0 !important;
+  min-height: 0 !important;
 }
-div[data-testid="stTextInputRootElement"]:focus-within { border-color: var(--acc-700) !important; }
-div[data-testid="stTextInput"] input { padding: 9px 11px !important; font-size: 14px !important; }
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button {
+  background: var(--color-accent-800) !important; border: 1px solid var(--color-accent-800) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button p {
+  font-size: 11px !important; color: #fff !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button:hover {
+  background: var(--color-accent-900) !important; border-color: var(--color-accent-900) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button {
+  background: #fff !important; border: 1px solid var(--color-neutral-400) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button p {
+  font-size: 11px !important; color: var(--color-accent-800) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:hover {
+  background: var(--color-accent-900) !important; border-color: var(--color-accent-900) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:hover p { color: #fff !important; }
+div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:disabled p { color: var(--color-neutral-400) !important; }
 
-/* ---------- print / Export to PDF ----------
-   The button calls window.print() — pure client-side, no server round trip —
-   and the browser's own "Save as PDF" print destination does the actual export.
-   A server-rendered PDF was deliberately not built: Streamlit Community Cloud's
-   free tier has no reliable way to run a headless-Chromium or Cairo/Pango PDF
-   renderer, and the browser already renders this exact CSS perfectly. */
+div[data-testid="stTextInputRootElement"], div[data-baseweb="input"], div[data-baseweb="select"] > div {
+  border-radius: 0 !important; background: #fff !important; box-shadow: none !important;
+}
+div[data-testid="stElementContainer"]:has(div[data-testid="stTextInput"]) {
+  max-width: 794px; margin: 0 auto;
+}
+
+/* =====================================================================
+   Print
+   ===================================================================== */
 @media print {
-  @page { size: A4 landscape; margin: 8mm; }
-  /* Browsers default to NOT printing background colors unless the user checks
-     "Background graphics" in the print dialog — an easy-to-miss, non-default
-     setting. Without it the navy header band prints as blank white, and its
-     white heading text becomes invisible against that white. This forces
-     every background (band, bar-chart fills, budget variance bars, etc.) to
-     print regardless of that toggle. */
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-  /* THE root cause of the "white shade over the whole page" + missing header
-     band in REAL print (Ctrl+P / the Export button), which page.pdf()-based
-     tests kept tolerating: Streamlit's own print stylesheet resets .stApp to
-     static, but leaves stAppViewContainer `position:absolute; inset:0` and
-     stMain at a fixed viewport height. Result: the printed document's BODY has
-     zero height (measured: scrollHeight 0) and the entire dashboard lives
-     inside an absolutely-positioned, viewport-sized, white-backgrounded box.
-     Chrome's print fragmentation handles that badly — the white layer washes
-     over content and the top-of-document band clips away. Making the whole
-     scaffold static/auto-height gives print a normally-flowing document
-     (body scrollHeight becomes the real content height) so fragmentation,
-     backgrounds, and page breaks all behave.
+  /* The page box IS the design here — 210 x 297mm with no margin at all, so
+     the sheet's own 40px padding is the only margin, exactly as on screen.
+     This replaces what doc-page.js injects in the prototype. */
+  @page { size: A4 portrait; margin: 0; }
 
-     The earlier pass reset only .stApp / stAppViewContainer / stMain and the
-     band STILL vanished from a real Ctrl+P, because one scaffold element sits
-     between the last two and was missed: the unlabelled
-     `[data-testid="stAppViewContainer"] > div` (position:relative; inset:0),
-     which keeps a viewport-height box. Measured under print emulation: stMain
-     was 1181px tall while that wrapper — and therefore body and html above it
-     — stayed pinned at 1000px, so the printed document's root box was again
-     SHORTER than its own content and Chrome fragmented the overflow rather
-     than the document. Resetting it (and html/body/#root above it) makes
-     body's height equal stMain's real content height. */
+  /* Browsers default to NOT printing background colours unless the user ticks
+     "Background graphics" — an easy-to-miss, non-default setting. Without it
+     the navy band prints blank white and its white text disappears. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+
+  /* Streamlit's print stylesheet leaves its scaffold absolutely positioned at
+     a fixed viewport height, which makes the printed document's body shorter
+     than its own content — Chrome then fragments the overflow rather than the
+     document, washing a white layer over everything and clipping the top of
+     the first sheet. Every element from <html> down to stMain has to become a
+     normally-flowing, auto-height box for print fragmentation to behave. */
   html, body, #root, [data-testid="stScreencast"], .stApp,
   [data-testid="stAppViewContainer"], [data-testid="stAppViewContainer"] > div,
   section.stMain {
-    position: static !important;
-    inset: auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
+    position: static !important; inset: auto !important;
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    overflow: visible !important; background: #fff !important;
   }
-  [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
-  [data-testid="stMainMenu"], .no-print { display: none !important; }
-  .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background: #fff !important; }
-  /* var(--bg) (#f2f2f3) is a deliberate very-light-grey card colour on screen —
-     forcing exact colour printing (above) means it now actually prints as that
-     grey instead of defaulting to white, and some print pipelines render that
-     subtle grey with a warm/beige cast. Force pure white for print specifically
-     so panels match the crisp white the dashboard reads as on screen. */
-  [data-testid="stMainBlockContainer"], .frame, .kpis .frame,
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { background: #fff !important; }
+  /* Pin the content column to the sheet width. Left wider, Chrome shrink-fits
+     the whole document to the paper and the 1:1 pixel mapping is lost. */
   [data-testid="stMainBlockContainer"] {
-    box-shadow: none !important; margin: 0 !important; max-width: 100% !important;
-    /* No top padding — paired with .band's zeroed top margin below, so the very
-       first printed element never starts above the flow origin. */
-    padding: 0 10px 4px !important;
+    width: 794px !important; max-width: 794px !important;
+    padding: 0 !important; margin: 0 !important; background: #fff !important;
   }
-  /* Screen sizing (readability on a monitor) is deliberately roomier than print
-     needs — the original two-page print design this mirrors ran ~9-11px type
-     throughout. Everything below tightens back toward that so the SAME content
-     (same row limits, same panels) fits two landscape pages instead of four. */
-  /* Screen bleeds the band out of the block container with a negative margin on
-     all three sides. In print the TOP one is dropped (the container's top
-     padding is zeroed to compensate, so the rendering is identical): a negative
-     top margin on the first element of a printed document puts its box above
-     the first fragmentainer's start, which Chrome resolves by clipping the band
-     away entirely. The side bleed is harmless and stays. break-after:avoid
-     keeps the band on the same page as the KPI tiles it heads. */
-  .band { margin: 0 -10px 6px !important; padding: 8px 14px 9px !important;
-          break-inside: avoid; break-after: avoid; }
-  .bandlogo { height: 42px !important; }
-  .band h1 { font-size: 23px !important; margin: 2px 0 !important; }
-  .kick { font-size: 8px !important; }
-  .bandsub { font-size: 9px !important; }
-  .kpis { gap: 6px !important; margin-bottom: 3px !important; }
-  .kpis .frame { padding: 4px 8px 4px !important; }
-  .kpis .v, .kpis .frame:first-child .v { font-size: 15px !important; }
-  .k { font-size: 8px !important; }
-  .v { font-size: 13px !important; }
-  .f { font-size: 8px !important; margin-top: 0 !important; line-height: 1.2 !important; }
-  .two { gap: 4px !important; }
-  .frame { margin-bottom: 1px !important; }
-  div[data-testid="stElementContainer"]:has(.note) { margin-bottom: 0 !important; }
-  .brow, table.dt tr, .stat { break-inside: avoid; }
-  .ph { padding: 1px 7px 1px !important; }
-  .pb { padding: 2px 7px 3px !important; }
-  .meta { font-size: 7.5px !important; }
-  .stats { margin-bottom: 2px !important; }
-  .stat { padding: 0 9px !important; }
-  .stat .v { font-size: 11px !important; line-height: 1.15 !important; }
-  table.dt { font-size: 8.5px !important; }
-  table.dt th { padding: 1px 4px !important; line-height: 1.1 !important; }
-  table.dt td { padding: 0.5px 4px !important; line-height: 1.15 !important; }
-  .brow { grid-template-columns: 100px 1fr 70px 38px !important; padding: 0 !important; }
-  .brow .nm, .brow .rv, .brow .mg, .nm, .rv, .mg { font-size: 8.5px !important; line-height: 1.15 !important; }
-  .brow.total .nm, .brow.total .rv, .brow.total .mg { font-size: 9.5px !important; }
-  .brow.total { margin-top: 1px !important; padding: 1px 0 !important; }
-  .track, .fill { height: 5px !important; }
-  .note { font-size: 8px !important; line-height: 1.2 !important; }
-  .empty { padding: 3px 0 !important; }
-  [data-testid="stHorizontalBlock"] { margin-bottom: 0 !important; gap: 7px !important; }
-  [data-testid="stElementContainer"] { margin-bottom: 0 !important; }
-  /* A plain st.markdown row here (the coverage note, or previously the OTHER
-     row before it switched to a button) intermittently rendered SHORTER than
-     its own wrapped text under print's narrower width — a real Chromium bug,
-     confirmed by measuring computed height directly: the element's box came
-     out smaller than its child content's own measured height, with no
-     min/max-height or overflow to explain it. Reproduces only when this
-     container is a flex column; content overflowed into the next sibling.
-     display:block sidesteps the entire bug — plain block flow always sizes to
-     content — at the cost of using margins instead of flex `gap` for spacing. */
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] { display: block !important; }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] > * { margin-bottom: 1.5px !important; }
-  /* display:block (above) didn't fully fix it either — the coverage note's own
-     box still measured shorter than its wrapped 2-line text even in block flow.
-     Brute-force workaround: give it enough margin to clear the shortfall no
-     matter how short the buggy box measures, since margin pushes the next
-     sibling down independently of the (buggy) content-box height. */
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stElementContainer"]:has(.coverage-note) {
-    margin-bottom: 18px !important;
+  div[data-testid="stVerticalBlock"] { gap: 0 !important; }
+
+  [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
+  [data-testid="stMainMenu"], .screen-only, .no-print { display: none !important; }
+  /* The two control bars are st.container()s, not markup we can hang a
+     .screen-only class on, so they are hidden through the same marker-scoped
+     selector that styles them. Left visible they occupy real height above the
+     first sheet and push the document onto a fifth page. */
+  div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-ctrlbar),
+  div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-drillbar),
+  [data-testid="stIFrame"], iframe { display: none !important; }
+
+  /* One .sheet, one sheet of paper. */
+  .sheet {
+    margin: 0 !important; box-shadow: none !important;
+    break-after: page; break-inside: avoid;
   }
-  /* The Bike sales by model drill-down uses native st.button/st.columns rows
-     (inline-styled, not the .brow class the other bar lists use), so none of
-     the .brow rules above touch it — it needs its own print shrink. */
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] [data-testid="stHorizontalBlock"] { gap: 4px !important; }
-  /* Browsers normalize a `style="...padding:3px 0"` attribute to "padding: 3px 0px"
-     (space after the colon, unit on the zero) — matching the raw string I write in
-     Python here never actually matched anything until this was fixed. */
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[style*="padding: 3px 0px"] { padding: 0 !important; }
-  /* Height still floors around 16px after zeroing every padding/margin down the
-     button's own DOM chain (button > div > span > span > div > p) — some element
-     in there keeps its own line-height-driven intrinsic height regardless. A
-     forced fixed height is the only thing that actually wins. */
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button {
-    font-size: 8.5px !important; line-height: 1.15 !important; padding: 0 !important; min-height: 0 !important;
-    height: 10px !important; display: flex !important; align-items: center !important;
-  }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] div[data-testid="stButton"] button p {
-    font-size: 8.5px !important; line-height: 1 !important;
-  }
-  div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .rv, div[data-testid="stVerticalBlock"][data-test-scroll-behavior] .mg {
-    font-size: 8.5px !important;
-  }
-  div[data-testid="stElementContainer"]:has(.marker-total-row) + div[data-testid="stLayoutWrapper"] button:disabled {
-    font-size: 9.5px !important;
-  }
-  .p2head { break-before: page; padding: 0 0 3px !important; margin-bottom: 3px !important; }
-  .p2head h2 { font-size: 15px !important; }
-  footer.notes { margin-top: 4px !important; padding-top: 4px !important; gap: 10px !important; }
+  .sheet:last-of-type { break-after: auto; }
 }
 </style>
 """
-st.markdown(STYLE, unsafe_allow_html=True)
+def css_for_markdown(text):
+    """Flatten the stylesheet into something st.markdown will pass through whole.
+
+    st.markdown renders Markdown BEFORE the HTML reaches the page, and two
+    separate Markdown rules each truncate a <style> block:
+
+      - Asterisks. The `*` closing a CSS comment sits after whitespace and
+        before `/`, so Markdown reads it as an emphasis opener and the `*`
+        opening the next comment closes the span. Both are eaten, `*/` becomes
+        `/`, and the browser treats everything after as one unterminated
+        comment. Measured: 1666 characters survived out of 12KB.
+      - Blank lines. A blank line closes a raw-HTML block, so the <style>
+        element only ever receives the text above the first one. Measured after
+        fixing the asterisks: 495 characters, ending mid-token-list.
+
+    st.html() is not the way out — it sanitises the <style> element away
+    entirely and renders an empty div.
+
+    So: drop the comments, then drop the blank lines. Both exist for whoever
+    reads this file, and neither changes what the browser computes. The comment
+    regex is safe here because the sheet holds no string or url() literal that
+    could contain a `/*` sequence.
+    """
+    without_comments = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return "\n".join(ln for ln in without_comments.split("\n") if ln.strip())
+
+
+st.markdown(css_for_markdown(STYLE), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- access gate
@@ -505,17 +537,24 @@ def check_password():
     if st.session_state.get("password_ok"):
         return True
 
+    # The gate wears the report's own page-1 band. It is wrapped in a .sheet so
+    # it inherits the same type scale and heading resets as the real thing —
+    # without that wrapper the band picks up Streamlit's heading padding and
+    # sits 36px taller than the one behind it.
     st.markdown(
-        f'''<div class="band">
-          <div>
-            <div class="kick">Specialized Paarl &middot; Lightspeed Retail</div>
-            <h1>Sales Dashboard</h1>
+        f'''<div class="sheet s1" style="height:auto;padding-bottom:0;margin-bottom:14px">
+          <div class="band">
+            <div>
+              <div class="eyebrow">Specialized Paarl · Lightspeed Retail</div>
+              <h1>Sales Dashboard</h1>
+            </div>
+            {logo_img()}
           </div>
-          {logo_img()}
         </div>''',
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="k" style="margin:4px 0 4px">Access code</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lbl" style="max-width:794px;margin:0 auto 4px">Access code</div>',
+                unsafe_allow_html=True)
     st.text_input("Access code", type="password", key="password_input", on_change=on_submit,
                   label_visibility="collapsed")
     if "password_ok" in st.session_state and not st.session_state["password_ok"]:
@@ -630,37 +669,59 @@ def sply_delta(curr, prior, is_points=False):
         return None
     sign = "+" if d >= 0 else "−"
     suffix = "pp" if is_points else "%"
-    color = "var(--acc-800)" if d >= 0 else "var(--clay)"
-    return f"{sign}{abs(d):.1f}{suffix} vs SPLY", color
+    colour = "var(--color-accent-800)" if d >= 0 else "var(--clay)"
+    return f"{sign}{abs(d):.1f}{suffix} vs SPLY", colour
 
 
 # ---------------------------------------------------------------- HTML builders
+#
+# Every builder below emits the markup of the approved A4 design, class-for-
+# class. The values themselves (grids, paddings, type sizes) live in STYLE
+# above rather than inline, so a section that appears on more than one sheet
+# picks up that sheet's density from `.sheet.s1` / `.sheet.sn` instead of
+# carrying two hard-coded variants.
 
-def kpi_tile(label, value, foot_plain=None, delta=None, bar_pct=None):
-    bar_html = ""
-    if bar_pct is not None:
-        w = max(0, min(100, round(bar_pct)))
-        bar_html = (f'<div style="margin-top:6px;height:6px;background:var(--track)">'
-                    f'<div style="height:6px;background:var(--acc-600);width:{w}%"></div></div>')
-    foot_bits = []
-    if foot_plain:
-        foot_bits.append(esc(foot_plain))
-    if delta:
-        text, color = delta
-        foot_bits.append(f'<span style="color:{color}">{esc(text)}</span>')
-    foot_html = f'<div class="f">{" &middot; ".join(foot_bits)}</div>' if foot_bits else ""
-    return (f'<div class="frame"><div class="k">{esc(label)}</div><div class="v">{esc(value)}</div>'
-            f'{bar_html}{foot_html}</div>')
+def section_header(title, eyebrow="", rhythm="normal", level=2):
+    """Heading left, uppercase eyebrow right, 1px rule under both.
+
+    `rhythm` selects the design's per-section padding/margin pair rather than
+    flattening them to one value — the design tunes each section separately.
+    """
+    eb = f'<div class="eyebrow">{esc(eyebrow)}</div>' if eyebrow else ""
+    return (f'<div class="sh {rhythm}"><h{level}>{esc(title)}</h{level}>{eb}</div>')
 
 
-def stats_html(items):
-    parts = []
-    for it in items:
-        style = f' style="color:{it["color"]}"' if it.get("color") else ""
-        foot = f'<div class="f">{esc(it["foot"])}</div>' if it.get("foot") else ""
-        parts.append(f'<div class="stat"><div class="k">{esc(it["label"])}</div>'
-                      f'<div class="v"{style}>{esc(it["value"])}</div>{foot}</div>')
-    return f'<div class="stats">{"".join(parts)}</div>'
+def page_header(title, eyebrow):
+    """Pages 2+. Note the 2px rule — deliberately heavier than section rules."""
+    return f'<div class="ph2"><h2>{esc(title)}</h2><div class="eyebrow">{esc(eyebrow)}</div></div>'
+
+
+def kpi_strip(cells):
+    """Four cells divided by hairlines, ruled above and below.
+
+    Each cell is eyebrow -> figure -> caption. The SPLY comparison, which the
+    A4 design has no slot of its own for, is appended to the caption so the
+    comparison survives without adding a row to the strip.
+    """
+    out = []
+    for c in cells:
+        foot = []
+        if c.get("foot"):
+            foot.append(esc(c["foot"]))
+        if c.get("delta"):
+            text, color = c["delta"]
+            foot.append(f'<span style="color:{color}">{esc(text)}</span>')
+        foot_html = f'<div class="f">{" · ".join(foot)}</div>' if foot else ""
+        out.append(f'<div class="kpi"><div class="k">{esc(c["label"])}</div>'
+                   f'<div class="v">{esc(c["value"])}</div>{foot_html}</div>')
+    return f'<div class="kpis">{"".join(out)}</div>'
+
+
+def bar_fill_colour(i):
+    """Rank 1 darkest, 2-3 mid, 4+ light — the design's fixed three-step ramp."""
+    return ("var(--color-accent-800)" if i == 0
+            else "var(--color-accent-600)" if i < 3
+            else "var(--color-accent-400)")
 
 
 def prep_bars(rows, limit=10):
@@ -678,6 +739,13 @@ def prep_bars(rows, limit=10):
 
 
 def bars_html(rows, total_rev, total_gp, empty_text="No sales in this period."):
+    """Bar list plus totals row.
+
+    Bar width is value / max(value) — proportional to the largest row, not to
+    the total, so the leader always fills the track. A negative row gets no
+    track behind it (a fill growing leftward from zero would misread as a
+    positive bar) and a clay value instead.
+    """
     if not rows:
         return f'<div class="empty">{esc(empty_text)}</div>'
     max_rev = max([r["revenue"] for r in rows] + [1])
@@ -686,32 +754,47 @@ def bars_html(rows, total_rev, total_gp, empty_text="No sales in this period."):
         label = esc(r["label"])
         rev, gp = r["revenue"], r["gross_profit"]
         width = max(0.0, rev / max_rev * 100) if max_rev else 0.0
-        color = "var(--acc-800)" if i == 0 else ("var(--acc-600)" if i < 3 else "var(--acc-400)")
-        track_bg = "transparent" if rev < 0 else "var(--track)"
+        track_bg = "transparent" if rev < 0 else "var(--color-neutral-200)"
         val_style = ' style="color:var(--clay)"' if rev < 0 else ""
         parts.append(
             f'<div class="brow"><div class="nm" title="{label}">{label}</div>'
-            f'<div class="track" style="background:{track_bg}"><div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
+            f'<div class="track" style="background:{track_bg}">'
+            f'<div class="fill" style="width:{width:.2f}%;background:{bar_fill_colour(i)}"></div></div>'
             f'<div class="rv"{val_style}>{money(rev)}</div>'
             f'<div class="mg">{pct(margin_of(gp, rev))}</div></div>'
         )
     parts.append(
         f'<div class="brow total"><div class="nm">Total</div><div></div>'
-        f'<div class="rv">{money(total_rev)}</div><div class="mg">{pct(margin_of(total_gp, total_rev))}</div></div>'
+        f'<div class="rv">{money(total_rev)}</div>'
+        f'<div class="mg">{pct(margin_of(total_gp, total_rev))}</div></div>'
     )
     return "".join(parts)
 
 
-def html_table(headers, rows, name_col=None, rank_col=None, empty_text="Nothing in this period."):
+def html_table(headers, rows, name_col=None, rank_col=None, muted_cols=(),
+               empty_text="Nothing in this period."):
     if not rows:
         return f'<div class="empty">{esc(empty_text)}</div>'
-    thead = "".join(f"<th>{esc(h)}</th>" for h in headers)
+    def hcls(i):
+        if i == name_col:
+            return ' class="name"'
+        if i == rank_col:
+            return ' class="rank"'
+        return ""
+
+    thead = "".join(f"<th{hcls(i)}>{esc(h)}</th>" for i, h in enumerate(headers))
     body = []
     for r in rows:
         tds = []
         for i, c in enumerate(r):
-            cls = "name" if i == name_col else ("rank" if i == rank_col else "")
-            cls_attr = f' class="{cls}"' if cls else ""
+            classes = []
+            if i == name_col:
+                classes.append("name")
+            if i == rank_col:
+                classes.append("rank")
+            if i in muted_cols:
+                classes.append("muted")
+            cls_attr = f' class="{" ".join(classes)}"' if classes else ""
             title_attr = f' title="{esc(c)}"' if i == name_col else ""
             val = c if isinstance(c, Raw) else esc(c)
             tds.append(f"<td{cls_attr}{title_attr}>{val}</td>")
@@ -719,10 +802,34 @@ def html_table(headers, rows, name_col=None, rank_col=None, empty_text="Nothing 
     return f'<table class="dt"><thead><tr>{thead}</tr></thead><tbody>{"".join(body)}</tbody></table>'
 
 
+def budget_summary(budget_total, actual_total, variance, variance_pct):
+    """Budget / Actual / Variance, divided by hairlines. Variance in clay when
+    under budget, accent when at or over."""
+    colour = "var(--clay)" if variance < 0 else "var(--color-accent-800)"
+    sign = "+" if variance >= 0 else "−"
+    vpct_text = "" if variance_pct is None or pd.isna(variance_pct) else \
+        f" · {sign}{abs(variance_pct):.1f}%"
+    return (
+        '<div class="bsum">'
+        f'<div><div class="k">Budget</div><div class="v">{money(budget_total)}</div></div>'
+        f'<div><div class="k">Actual</div><div class="v">{money(actual_total)}</div></div>'
+        f'<div><div class="k">Variance</div><div class="v" style="color:{colour}">'
+        f'{sign}{money(abs(variance))}{vpct_text}</div></div>'
+        '</div>'
+    )
+
+
 def budget_table_html(rows):
-    ths = "".join(
-        f'<th{" style=\"text-align:left;padding-left:10px\"" if h == "Variance" else ""}>{h}</th>'
-        for h in ["Category", "Budget", "Actual", "Variance", "%"]
+    """Category table with the diverging under/over bar.
+
+    The bar saturates at +/-25%: a category 80% over budget and one 30% over
+    both render as a full bar, and the signed figure beside it carries the
+    exact value. Without the clamp a single wild category flattens every other
+    bar to invisibility.
+    """
+    ths = (
+        '<th class="name">Category</th><th>Budget</th><th>Actual</th>'
+        '<th class="vbarh">Under · over</th><th>Variance</th>'
     )
     trs = []
     for r in rows:
@@ -731,29 +838,55 @@ def budget_table_html(rows):
         neg_w = w if r["variance"] < 0 else 0.0
         pos_w = w if r["variance"] >= 0 else 0.0
         bar = (
-            '<div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;height:8px">'
-            '<div style="display:flex;justify-content:flex-end;border-right:1px solid var(--rule);height:8px">'
-            f'<div style="height:8px;background:var(--clay);width:{neg_w:.1f}%"></div></div>'
-            '<div style="display:flex;height:8px">'
-            f'<div style="height:8px;background:var(--acc-600);width:{pos_w:.1f}%"></div></div></div>'
+            '<div class="vwrap">'
+            f'<div class="vneg"><div style="width:{neg_w:.1f}%"></div></div>'
+            f'<div class="vpos"><div style="width:{pos_w:.1f}%"></div></div>'
+            '</div>'
         )
-        pct_color = "var(--acc-800)" if r["variance"] >= 0 else "var(--clay)"
+        colour = "var(--color-accent-800)" if r["variance"] >= 0 else "var(--clay)"
         if vpct is None or pd.isna(vpct):
             pct_text = "—"
         else:
             pct_text = f'{"+" if r["variance"] >= 0 else chr(0x2212)}{abs(vpct):.1f}%'
         trs.append(
-            f'<tr><td class="name">{esc(r["category"])}</td><td>{money(r["budget"])}</td><td>{money(r["actual"])}</td>'
-            f'<td style="padding-left:10px">{bar}</td>'
-            f'<td style="color:{pct_color}">{pct_text}</td></tr>'
+            f'<tr><td class="name">{esc(r["category"])}</td>'
+            f'<td class="muted">{money(r["budget"])}</td><td>{money(r["actual"])}</td>'
+            f'<td class="vbar">{bar}</td>'
+            f'<td style="color:{colour}">{pct_text}</td></tr>'
         )
     return f'<table class="dt"><thead><tr>{ths}</tr></thead><tbody>{"".join(trs)}</tbody></table>'
 
 
-def frame(title, meta_text, body_html):
-    meta_html = f'<div class="meta">{esc(meta_text)}</div>' if meta_text else ""
-    return (f'<div class="frame"><div class="ph"><h3>{esc(title)}</h3>{meta_html}</div>'
-            f'<div class="pb">{body_html}</div></div>')
+def stat_card(title, figure, caption, subs, figure_colour=None):
+    """One Operating health card: title, big figure + caption, then label/value
+    sub-rows. `subs` items may carry a "colour" to mark an unfavourable value."""
+    fig_style = f' style="color:{figure_colour}"' if figure_colour else ""
+    sub_html = "".join(
+        f'<div><span>{esc(s["label"])}</span>'
+        f'<span{f" style=\"color:{s["colour"]}\"" if s.get("colour") else ""}>{esc(s["value"])}</span></div>'
+        for s in subs
+    )
+    return (
+        f'<div class="card"><div class="t">{esc(title)}</div>'
+        f'<div class="figrow"><div class="fig"{fig_style}>{esc(figure)}</div>'
+        f'<div class="cap">{esc(caption)}</div></div>'
+        f'<div class="subs">{sub_html}</div></div>'
+    )
+
+
+def stats_html(items):
+    """A row of small figures, used on the detail sheets where a full card grid
+    would be too heavy. Same type scale as the card's sub-rows."""
+    parts = []
+    for it in items:
+        style = f' style="color:{it["colour"]}"' if it.get("colour") else ""
+        foot = f'<div class="cap">{esc(it["foot"])}</div>' if it.get("foot") else ""
+        parts.append(f'<div><div class="k" style="font-size:10px;letter-spacing:0.13em;'
+                     f'text-transform:uppercase;color:var(--color-accent-700)">{esc(it["label"])}</div>'
+                     f'<div class="v" style="font-family:var(--font-heading);font-size:21px;'
+                     f'line-height:1.1;font-variant-numeric:tabular-nums;margin-top:2px"{style}>'
+                     f'{esc(it["value"])}</div>{foot}</div>')
+    return f'<div class="bsum">{"".join(parts)}</div>'
 
 
 # ---------------------------------------------------------------- adjustments
@@ -771,83 +904,170 @@ def get_adjustments(from_date, to_date):
     return rows, revenue, cost, revenue - cost
 
 
-# ---------------------------------------------------------------- sidebar / period
-
-PRESETS = {
-    "MTD": lambda today: (today.replace(day=1), today),
-    "30d": lambda today: (today - dt.timedelta(days=29), today),
-    "90d": lambda today: (today - dt.timedelta(days=89), today),
-    "YTD": lambda today: (today.replace(month=1, day=1), today),
-    "12m": lambda today: (today.replace(year=today.year - 1), today),
-    "All time": lambda today: (None, None),
-}
-
-st.sidebar.markdown('<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;'
-                     'font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:6px">Filters</div>',
-                     unsafe_allow_html=True)
-# Lives in the sidebar deliberately — the top-right of the main content area is
-# Streamlit's own reserved territory (header menu, deploy button, promotional
-# toast nudges), all of which sit at a higher z-index and silently swallow clicks
-# on anything placed there. The sidebar is a separate DOM region Streamlit never
-# overlays, so this is the one placement guaranteed not to collide with its chrome.
+# ---------------------------------------------------------------- screen chrome / period
 #
-# A raw `onclick="window.print()"` on an unsafe_allow_html button worked locally
-# but did nothing at all on Streamlit Community Cloud — inline event-handler
-# attributes are exactly what a strict Content-Security-Policy blocks first, and
-# Cloud's hosting layer applies one that the local dev server doesn't. A real
-# st.button() sidesteps that entirely (Streamlit's own click plumbing, not a raw
-# HTML attribute), and st.components.v1.html renders inside a proper iframe
-# document where a <script> tag actually executes — unlike unsafe_allow_html,
-# which the browser never runs embedded <script> tags for regardless of CSP.
-st.sidebar.markdown('<span class="marker-pdfbtn" style="display:none"></span>', unsafe_allow_html=True)
-if st.sidebar.button("Export to PDF", key="export_pdf_btn", use_container_width=True):
-    st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
-today = dt.date.today()
+# The A4 design replaces the old filter sidebar with a single control bar that
+# sits ABOVE the document, aligned to the sheet width, and is excluded from
+# print. Everything the sidebar used to do lives here.
+#
+# On the financial year: the design's `Financial YTD` preset assumed a 1 July
+# start, inferred from sales data beginning 1 Jul 2023 and flagged in the
+# handoff as unconfirmed. The budget table is better evidence — it runs
+# 2023-07 to 2027-06, four complete July-to-June years — so 1 July is used
+# here. It is still worth confirming with the shop before the figure is
+# quoted anywhere binding.
+FY_START_MONTH = 7
 
-if "preset" not in st.session_state:
-    st.session_state.preset = "All time"
-
-st.sidebar.markdown('<div class="k" style="margin-bottom:4px">Period preset</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<span class="marker-preset" style="display:none"></span>', unsafe_allow_html=True)
-preset = st.sidebar.radio("Period preset", list(PRESETS.keys()),
-                           index=list(PRESETS.keys()).index(st.session_state.preset),
-                           label_visibility="collapsed")
-st.session_state.preset = preset
-default_from, default_to = PRESETS[preset](today)
-
-st.sidebar.markdown('<div class="k" style="margin:12px 0 4px">Custom range</div>', unsafe_allow_html=True)
-c1, c2 = st.sidebar.columns(2)
-from_date = c1.date_input("From", value=default_from, format="YYYY-MM-DD") if default_from else c1.date_input("From", value=None, format="YYYY-MM-DD")
-to_date = c2.date_input("To", value=default_to, format="YYYY-MM-DD") if default_to else c2.date_input("To", value=None, format="YYYY-MM-DD")
-
-params = period_params(from_date, to_date)
-showing = f"{from_date} to {to_date}" if (from_date or to_date) else "All time"
-st.sidebar.markdown(
-    f'<div style="border-top:1px solid var(--divider);margin-top:11px;padding-top:8px">'
-    f'<div class="k" style="margin-bottom:2px">Showing</div>'
-    f'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;line-height:1.15">{esc(showing)}</div>'
-    f'<div class="note" style="margin-top:6px">Scopes every panel except stock on hand, which is a point-in-time position.</div>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
-
-meta_row = q1("SELECT value FROM snapshot_meta WHERE key = 'exported_at'")
-counts = q1("SELECT (SELECT COUNT(*) FROM sales) AS sales, (SELECT COUNT(*) FROM sale_lines) AS sale_lines")
-sync_caption = "Sync status unavailable"
-if meta_row:
-    stamp = meta_row["value"][:16].replace("T", " ")
-    sync_caption = f"Data as of {stamp} UTC &middot; {counts['sales']:,} sales &middot; {counts['sale_lines']:,} lines &middot; refreshed manually, not live"
-
-# ---------------------------------------------------------------- KPIs (+ SPLY)
 
 def shift_year(d, delta):
+    """Same calendar day, `delta` years away. 29 Feb clamps back to the 28th."""
     if d is None:
         return None
     try:
         return d.replace(year=d.year + delta)
     except ValueError:
-        return d.replace(month=2, day=28, year=d.year + delta)  # 29 Feb clamp
+        return d.replace(month=2, day=28, year=d.year + delta)
 
+
+def financial_ytd(today):
+    year = today.year if today.month >= FY_START_MONTH else today.year - 1
+    return dt.date(year, FY_START_MONTH, 1), today
+
+
+PRESETS = {
+    "All time":       lambda today: (None, None),
+    "Financial YTD":  financial_ytd,
+    "Calendar YTD":   lambda today: (today.replace(month=1, day=1), today),
+    "Month to date":  lambda today: (today.replace(day=1), today),
+    "Last 30 days":   lambda today: (today - dt.timedelta(days=29), today),
+    "Last 90 days":   lambda today: (today - dt.timedelta(days=89), today),
+    "Last 12 months": lambda today: (shift_year(today, -1), today),
+    "Custom":         lambda today: (None, None),
+}
+
+today = dt.date.today()
+if "preset" not in st.session_state:
+    st.session_state.preset = "All time"
+if "filter_open" not in st.session_state:
+    st.session_state.filter_open = False   # collapsed by default, per the design
+
+# The data window bounds the custom date inputs. Derived from the snapshot
+# rather than hard-coded — the handoff's 2023-07-01 lower bound came from the
+# budget table, not the sales data, and is nearly two and a half years late.
+bounds = q1("""
+    SELECT substr(MIN(COALESCE(complete_time, sale_time)), 1, 10) lo,
+           substr(MAX(COALESCE(complete_time, sale_time)), 1, 10) hi
+    FROM sales WHERE completed = 1 AND voided = 0
+""")
+data_lo = dt.date.fromisoformat(bounds["lo"]) if bounds and bounds["lo"] else dt.date(2000, 1, 1)
+data_hi = dt.date.fromisoformat(bounds["hi"]) if bounds and bounds["hi"] else today
+
+
+def fmt_day(d):
+    """`1 Jul 2026` — the design's date format."""
+    return f"{d.day} {d:%b %Y}"
+
+
+ctrl = st.container()
+with ctrl:
+    st.markdown('<span class="mk-ctrlbar" style="display:none"></span>', unsafe_allow_html=True)
+    head = st.columns([6, 2, 2], gap="small", vertical_alignment="center")
+    period_slot = head[0].empty()   # filled once the dates below are resolved
+
+    with head[1]:
+        st.markdown('<span class="mk-toggle" style="display:none"></span>', unsafe_allow_html=True)
+        if st.button("Hide filter" if st.session_state.filter_open else "Change period",
+                     key="toggle_filter", use_container_width=True):
+            st.session_state.filter_open = not st.session_state.filter_open
+            st.rerun()
+    with head[2]:
+        # A raw `onclick="window.print()"` worked locally but did nothing on
+        # Streamlit Community Cloud: inline event-handler attributes are the
+        # first thing a strict Content-Security-Policy blocks, and Cloud applies
+        # one the local dev server doesn't. A real st.button uses Streamlit's own
+        # click plumbing, and st.components.v1.html renders a proper iframe
+        # document where a <script> tag actually executes — unlike
+        # unsafe_allow_html, which never runs embedded scripts regardless of CSP.
+        st.markdown('<span class="mk-print" style="display:none"></span>', unsafe_allow_html=True)
+        print_clicked = st.button("Print to PDF", key="print_pdf", use_container_width=True)
+
+    if st.session_state.filter_open:
+        st.markdown('<div class="ctrlrule"></div>', unsafe_allow_html=True)
+        # st.segmented_control, not st.radio: the design's preset row IS a
+        # segmented control, and Streamlit's radio draws its selection dot with
+        # a pseudo-element that cannot be reliably hidden from an injected
+        # stylesheet. The native widget already has the right shape.
+        st.markdown('<span class="mk-preset" style="display:none"></span>', unsafe_allow_html=True)
+        preset = st.segmented_control("Reporting period", list(PRESETS.keys()),
+                                      default=st.session_state.preset,
+                                      label_visibility="collapsed", key="preset_pick")
+        preset = preset or st.session_state.preset
+        st.session_state.preset = preset
+    else:
+        preset = st.session_state.preset
+
+default_from, default_to = PRESETS[preset](today)
+# Presets run to "today", but the snapshot ends whenever it was last exported.
+# Left unclamped the band states a period that extends past the data it is
+# reporting on — the query returns nothing for those days, so the figures and
+# the stated period would disagree.
+if default_to and default_to > data_hi:
+    default_to = data_hi
+
+if preset == "Custom":
+    with ctrl:
+        dcols = st.columns([2, 2, 6], gap="small")
+        from_date = dcols[0].date_input("From", value=st.session_state.get("custom_from", data_lo),
+                                        min_value=data_lo, max_value=data_hi,
+                                        format="YYYY-MM-DD", key="custom_from")
+        to_date = dcols[1].date_input("To", value=st.session_state.get("custom_to", data_hi),
+                                      min_value=data_lo, max_value=data_hi,
+                                      format="YYYY-MM-DD", key="custom_to")
+else:
+    from_date, to_date = default_from, default_to
+
+if st.session_state.filter_open:
+    with ctrl:
+        st.markdown(
+            '<div class="ctrlnote">Scopes every figure on every sheet except stock on hand, '
+            'which is a point-in-time position and is labelled as such.</div>',
+            unsafe_allow_html=True,
+        )
+
+params = period_params(from_date, to_date)
+
+# The period line stamped into the page 1 band, and echoed in the control bar.
+band_from = from_date or data_lo
+band_to = to_date or data_hi
+range_text = f"{fmt_day(band_from)} – {fmt_day(band_to)}"       # en dash, per the design
+period_label = range_text if preset == "Custom" else f"{preset} · {range_text}"
+period_slot.markdown(
+    f'<div class="lbl">Reporting period</div>'
+    f'<div class="cur">{period_label}</div>',
+    unsafe_allow_html=True,
+)
+
+if print_clicked:
+    st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
+
+meta_row = q1("SELECT value FROM snapshot_meta WHERE key = 'exported_at'")
+synced_text = "Sync status unavailable"
+if meta_row:
+    stamp = dt.datetime.fromisoformat(meta_row["value"][:19])
+    synced_text = f"Synced {fmt_day(stamp.date())}, {stamp:%H:%M}"
+
+# Period-scoped row counts for the band, not the whole-snapshot totals: the
+# band states the size of the period being reported on, so it has to move with
+# the filter.
+period_counts = q1(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT (SELECT COUNT(*) FROM valid) AS sales,
+           (SELECT COUNT(*) FROM lines) AS lines
+""", params)
+counts_text = f"{period_counts['sales']:,} sales · {period_counts['lines']:,} lines"
+
+
+# ---------------------------------------------------------------- KPIs (+ SPLY)
 
 kpi_sql = f"""
 WITH {VALID_SALE_CTE}
@@ -883,48 +1103,6 @@ if from_date or to_date:
     sp_margin = margin_of(sp_gp, sp_rev)
     sp_avg = sp_rev / sp_raw["transactions"] if sp_raw["transactions"] else None
     sply = {"revenue": sp_rev, "gp": sp_gp, "margin": sp_margin, "avg": sp_avg}
-
-# ---------------------------------------------------------------- band header
-
-date_bounds = q1(f"""
-    SELECT substr(MIN(COALESCE(complete_time, sale_time)), 1, 10) lo,
-           substr(MAX(COALESCE(complete_time, sale_time)), 1, 10) hi
-    FROM sales WHERE completed = 1 AND voided = 0
-""")
-if from_date or to_date:
-    period_text = f"{from_date or date_bounds['lo']} to {to_date or date_bounds['hi']}"
-else:
-    period_text = f"{date_bounds['lo']} to {date_bounds['hi']} (all time)"
-
-st.markdown(
-    f'''<div class="band">
-      <div>
-        <div class="kick">Specialized Paarl &middot; Lightspeed Retail</div>
-        <h1>Sales Dashboard</h1>
-        <div class="bandsub">{esc(preset)} &middot; {esc(period_text)} &middot; ZAR, ex-VAT and net of discounts</div>
-        <div class="bandsub">{sync_caption}</div>
-      </div>
-      {logo_img()}
-    </div>''',
-    unsafe_allow_html=True,
-)
-
-# ---------------------------------------------------------------- KPI tiles
-
-tiles = [
-    kpi_tile("Revenue (ex-VAT, net of discount)", zar(kpis["revenue"]),
-             foot_plain=f"{kpis['transactions']:,} transactions",
-             delta=sply_delta(kpis["revenue"], sply["revenue"]) if sply else None),
-    kpi_tile("Gross profit", zar(gp),
-             foot_plain=f"Revenue less ZAR {compact(kpis['cogs'])} COGS",
-             delta=sply_delta(gp, sply["gp"]) if sply else None),
-    kpi_tile("Gross margin", pct(margin), bar_pct=margin,
-             delta=sply_delta(margin, sply["margin"], is_points=True) if sply else None),
-    kpi_tile("Average sale value", zar(avg_sale),
-             foot_plain=f"{kpis['units']:,.0f} units sold",
-             delta=sply_delta(avg_sale, sply["avg"]) if sply else None),
-]
-st.markdown(f'<div class="kpis">{"".join(tiles)}</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------- category & budget
 
@@ -963,13 +1141,16 @@ if not adj_rows.empty:
 
 cat_rows = [{"label": r["category"], "revenue": r["revenue"], "gross_profit": r["gross_profit"]}
             for _, r in by_category.iterrows()]
-shown, tot_rev, tot_gp = prep_bars(cat_rows, limit=10)
-cat_body = bars_html(shown, tot_rev, tot_gp)
+# Nine rows plus a total is what the design's page-1 box fits. prep_bars rolls
+# everything past that into a single OTHER row, but still totals over the full
+# set, so the total reconciles with the KPI strip above it.
+cat_shown, cat_tot_rev, cat_tot_gp = prep_bars(cat_rows, limit=9)
+cat_body = bars_html(cat_shown, cat_tot_rev, cat_tot_gp)
 
 budget_all = q("SELECT * FROM budget")
 if budget_all.empty:
     budget_body = '<div class="empty">No budget data in the snapshot.</div>'
-    budget_meta = "—"
+    budget_meta = "No budget loaded"
 else:
     categories = sorted(budget_all["category"].unique())
     months = sorted(budget_all["month"].unique())
@@ -983,8 +1164,8 @@ else:
         FROM sales WHERE completed = 1 AND voided = 0
     """)
 
-    eff_from = max(filter(None, [from_date.isoformat() if from_date else None, budget_first, data_range["lo"]]))
-    eff_to = min(filter(None, [to_date.isoformat() if to_date else None, budget_last.isoformat(), data_range["hi"]]))
+    bud_from = max(filter(None, [from_date.isoformat() if from_date else None, budget_first, data_range["lo"]]))
+    bud_to = min(filter(None, [to_date.isoformat() if to_date else None, budget_last.isoformat(), data_range["hi"]]))
 
     def prorate(row_from, row_to, req_from, req_to):
         lo = max(row_from, req_from)
@@ -1000,7 +1181,7 @@ else:
         y, m = (int(x) for x in r["month"].split("-"))
         m_start = dt.date(y, m, 1)
         m_end = (dt.date(y, m + 1, 1) - dt.timedelta(days=1)) if m < 12 else dt.date(y, 12, 31)
-        share = prorate(m_start, m_end, dt.date.fromisoformat(eff_from), dt.date.fromisoformat(eff_to))
+        share = prorate(m_start, m_end, dt.date.fromisoformat(bud_from), dt.date.fromisoformat(bud_to))
         prorated[r["category"]] = prorated.get(r["category"], 0) + r["amount"] * share
 
     actual_by_cat = q(f"""
@@ -1011,10 +1192,10 @@ else:
         LEFT JOIN items i ON i.item_id = l.item_id
         LEFT JOIN categories c ON c.category_id = i.category_id
         GROUP BY category
-    """, {"from_date": eff_from, "to_date": eff_to})
+    """, {"from_date": bud_from, "to_date": bud_to})
     actual_map = dict(zip(actual_by_cat["category"], actual_by_cat["revenue"]))
 
-    adj_win_rows, _, _, _ = get_adjustments(dt.date.fromisoformat(eff_from), dt.date.fromisoformat(eff_to))
+    adj_win_rows, _, _, _ = get_adjustments(dt.date.fromisoformat(bud_from), dt.date.fromisoformat(bud_to))
     if not adj_win_rows.empty:
         item_cat = q("""
             SELECT UPPER(TRIM(i.description)) d, COALESCE(c.top_level_name,'Uncategorised') cat
@@ -1030,7 +1211,7 @@ else:
         b = prorated.get(cat, 0.0)
         a = actual_map.get(cat, 0.0)
         comparison.append({"category": cat, "budget": b, "actual": a, "variance": a - b,
-                            "variance_pct": ((a - b) / b * 100) if b else None})
+                           "variance_pct": ((a - b) / b * 100) if b else None})
     comp_sorted = sorted(comparison, key=lambda r: r["budget"], reverse=True)
     unbudgeted = sum(v for k, v in actual_map.items() if k not in categories)
 
@@ -1039,328 +1220,77 @@ else:
     tv = ta - tb
     tv_pct = (tv / tb * 100) if tb else None
 
-    budget_meta = f"{eff_from} to {eff_to}"
-    stats = stats_html([
-        {"label": "Budget for the period", "value": zar(tb)},
-        {"label": "Actual", "value": zar(ta), "foot": "Includes off-Lightspeed adjustments"},
-        {"label": "Variance", "value": f'{"+" if tv >= 0 else chr(0x2212)}{zar(abs(tv))}',
-         "color": "var(--acc-800)" if tv >= 0 else "var(--clay)",
-         "foot": f'{pct(tv_pct)} vs budget' if tv_pct is not None else None},
-    ])
-    note_bits = [f"Only the {len(categories)} budgeted categories are compared; partial months prorated by day."]
+    budget_meta = (f"{fmt_day(dt.date.fromisoformat(bud_from))} – {fmt_day(dt.date.fromisoformat(bud_to))}"
+                   f" · {len(categories)} budgeted categories")
+    budget_body = budget_summary(tb, ta, tv, tv_pct) + budget_table_html(comp_sorted)
+    budget_note = f"Only the {len(categories)} budgeted categories are compared; partial months prorated by day."
     if unbudgeted:
-        note_bits.append(f"A further {zar(unbudgeted)} sits in unbudgeted categories — context, not variance.")
-    budget_body = stats + budget_table_html(comp_sorted) + f'<div class="note" style="margin-top:6px">{" ".join(note_bits)}</div>'
+        budget_note += f" A further {zar(unbudgeted)} sits in unbudgeted categories — context, not variance."
 
-col1, col2 = st.columns(2, gap="small")
-col1.markdown(frame("Sales by category", "Revenue · margin", cat_body), unsafe_allow_html=True)
-col2.markdown(frame("Budget vs actual", budget_meta, budget_body), unsafe_allow_html=True)
+# ---------------------------------------------------------------- operating health
+#
+# The three cards on page 1. Each compresses a detail table that the A4 design
+# cut from the report but which still appears in full on the detail sheets.
 
-# ---------------------------------------------------------------- bike model drill-down + attach rate
-
-if "drill_model" not in st.session_state:
-    st.session_state.drill_model = None
-    st.session_state.drill_trim = None
-
-model_col, attach_col = st.columns(2, gap="small")
-
-with model_col:
-    with st.container(border=True):
-        level = "model"
-        drill_params = dict(params)
-        where_extra = ""
-        if st.session_state.drill_model:
-            where_extra += " AND im.model = :drill_model"
-            drill_params["drill_model"] = st.session_state.drill_model
-            if st.session_state.drill_trim:
-                level = "size"
-                group_expr = "COALESCE(im.size, '(no size recorded)')"
-                if st.session_state.drill_trim == "(no trim recorded)":
-                    where_extra += " AND im.trim IS NULL"
-                else:
-                    where_extra += " AND im.trim = :drill_trim"
-                    drill_params["drill_trim"] = st.session_state.drill_trim
-            else:
-                level = "trim"
-                group_expr = "COALESCE(im.trim, '(no trim recorded)')"
-        else:
-            group_expr = "im.model"
-
-        st.markdown(f'<div class="ph"><h3>Bike sales by model</h3><div class="meta">Revenue &middot; margin</div></div>',
-                    unsafe_allow_html=True)
-
-        crumb_row = st.columns([1, 1, 2], gap="small")
-        if crumb_row[0].button("All models", disabled=not st.session_state.drill_model, key="crumb_all"):
-            st.session_state.drill_model = None
-            st.session_state.drill_trim = None
-            st.rerun()
-        if st.session_state.drill_model:
-            if crumb_row[1].button(st.session_state.drill_model, disabled=not st.session_state.drill_trim, key="crumb_model"):
-                st.session_state.drill_trim = None
-                st.rerun()
-        if st.session_state.drill_trim:
-            crumb_row[2].markdown(f'<div class="crumbs" style="padding-top:6px">{esc(st.session_state.drill_trim)}</div>', unsafe_allow_html=True)
-
-        st.markdown('<span class="marker-kind" style="display:none"></span>', unsafe_allow_html=True)
-        kind_filter = st.radio("Form", ["Complete bikes", "All forms"], horizontal=True, label_visibility="collapsed", key="kind_filter")
-        kind_clause = "" if kind_filter == "All forms" else "AND im.kind = 'complete'"
-
-        model_df = q(f"""
-            WITH {VALID_SALE_CTE}
-            SELECT {group_expr} AS label,
-                   SUM(l.revenue) AS revenue,
-                   SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
-                   SUM(l.quantity) AS units
-            FROM lines l
-            JOIN item_models im ON im.item_id = l.item_id
-            WHERE im.model IS NOT NULL {kind_clause} {where_extra}
-            GROUP BY label
-            HAVING SUM(l.revenue) <> 0
-            ORDER BY revenue DESC
-        """, drill_params)
-
-        coverage = q1(f"""
-            WITH {VALID_SALE_CTE}
-            SELECT
-              (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind='complete') AS complete_rev,
-              (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind<>'complete') AS other_rev
-        """, params)
-
-        if level == "model" and kind_filter == "Complete bikes" and coverage["other_rev"]:
-            st.markdown(
-                f'<div class="note coverage-note" style="margin-bottom:4px">Complete bikes only: {zar(coverage["complete_rev"])}. '
-                f'A further {zar(coverage["other_rev"])} of bike-category revenue is framesets, bare frames, '
-                f'build kits and rentals — switch to "All forms" to include it.</div>',
-                unsafe_allow_html=True,
-            )
-
-        model_rows = [{"label": r["label"], "revenue": r["revenue"], "gross_profit": r["gross_profit"]}
-                      for _, r in model_df.iterrows()]
-
-        if model_rows and level != "size":
-            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
-            max_rev = max([r["revenue"] for r in shown_m] + [1])
-
-            # Every row — regular, OTHER, and Total — uses the SAME st.columns([1, 2])
-            # split for the name vs. bar/value/margin. They used to diverge: OTHER and
-            # Total rendered through the fixed-pixel .brow CSS grid (to dodge a
-            # Streamlit column-collapse bug under narrow widths — see history), while
-            # regular rows used st.columns' proportional split. Those two mechanisms
-            # size the name column differently, so numbers didn't line up between rows.
-            # Rendering every row the same way is what actually fixes that.
-            def render_row(label, revenue, gross_profit, width, color, key, *, clickable=False, bold=False):
-                row_cols = st.columns([1, 2], gap="small")
-                # OTHER and Total render an actual (disabled) button here too, not a plain
-                # <div> — a plain-markdown first column, under the narrower effective width
-                # of a print page, tripped Streamlit's own column-wrap measurement and
-                # collapsed that row to zero height, overlapping the row below it. Every
-                # *real* button-based row never showed that bug, so giving every row a
-                # button element (disabled where there's nothing to click) sidesteps it,
-                # and disabled buttons are restyled via CSS to look identical to plain text.
-                clicked = row_cols[0].button(label, key=key, disabled=not clickable)
-                val_style = "font-size:13px;font-weight:700" if bold else ""
-                # Total has no meaningful "share of max" — it's the sum, not a data point —
-                # so no track/bar at all, not just an empty one.
-                track_html = "" if bold else (
-                    f'<div class="track" style="flex:1 1 auto">'
-                    f'<div class="fill" style="width:{width:.2f}%;background:{color}"></div></div>'
-                )
-                row_cols[1].markdown(
-                    f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
-                    f'{track_html}'
-                    f'<div class="rv" style="flex:{"1 1 auto;text-align:right" if bold else "0 0 auto"};white-space:nowrap;{val_style}">{money(revenue)}</div>'
-                    f'<div class="mg" style="flex:0 0 auto;white-space:nowrap;width:40px;{val_style}">{pct(margin_of(gross_profit, revenue))}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-                return clicked
-
-            for i, r in enumerate(shown_m):
-                is_other = r["label"].startswith("OTHER (")
-                width = max(0.0, r["revenue"] / max_rev * 100) if max_rev else 0.0
-                color = "var(--acc-800)" if i == 0 else ("var(--acc-600)" if i < 3 else "var(--acc-400)")
-                if is_other:
-                    render_row(r["label"], r["revenue"], r["gross_profit"], width, color, key=f"other_{level}_{i}")
-                    continue
-                if render_row(r["label"], r["revenue"], r["gross_profit"], width, color,
-                               key=f"drill_{level}_{i}_{r['label']}", clickable=True):
-                    if level == "model":
-                        st.session_state.drill_model = r["label"]
-                    else:
-                        st.session_state.drill_trim = r["label"]
-                    st.rerun()
-
-            st.markdown(
-                '<span class="marker-total-row" style="display:none"></span>'
-                '<div style="border-top:1.5px solid var(--rule);margin-top:4px;padding-top:2px"></div>',
-                unsafe_allow_html=True,
-            )
-            render_row("Total", tot_rev_m, tot_gp_m, 0, "transparent", key=f"total_{level}", bold=True)
-        else:
-            shown_m, tot_rev_m, tot_gp_m = prep_bars(model_rows, limit=8)
-            st.markdown(bars_html(shown_m, tot_rev_m, tot_gp_m, empty_text="No bike sales in this period."),
-                        unsafe_allow_html=True)
-
-with attach_col:
-    attach_summary = q1(f"""
-        WITH {VALID_SALE_CTE},
-        bike_sales AS (
-            SELECT DISTINCT l.sale_id FROM lines l
-            JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
-        ),
-        attached AS (
-            SELECT l.sale_id, l.revenue, l.quantity
-            FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
-            LEFT JOIN items i ON i.item_id = l.item_id
-            LEFT JOIN categories c ON c.category_id = i.category_id
-            WHERE c.top_level_name IS NULL OR c.top_level_name NOT IN ('BIKE','TURBO')
-        )
-        SELECT (SELECT COUNT(*) FROM bike_sales) AS bike_transactions,
-               (SELECT COUNT(DISTINCT sale_id) FROM attached WHERE revenue > 0) AS transactions_with_attachment,
-               (SELECT COALESCE(SUM(revenue), 0) FROM attached) AS attached_revenue,
-               (SELECT COALESCE(SUM(quantity), 0) FROM attached) AS attached_units
-    """, params)
-
-    attach_by_cat = q(f"""
-        WITH {VALID_SALE_CTE},
-        bike_sales AS (
-            SELECT DISTINCT l.sale_id FROM lines l
-            JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
-        )
-        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-               SUM(l.revenue) AS revenue,
-               SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
-               SUM(l.quantity) AS units
+attach_summary = q1(f"""
+    WITH {VALID_SALE_CTE},
+    bike_sales AS (
+        SELECT DISTINCT l.sale_id FROM lines l
+        JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
+    ),
+    attached AS (
+        SELECT l.sale_id, l.revenue, l.quantity
         FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
         LEFT JOIN items i ON i.item_id = l.item_id
         LEFT JOIN categories c ON c.category_id = i.category_id
         WHERE c.top_level_name IS NULL OR c.top_level_name NOT IN ('BIKE','TURBO')
-        GROUP BY category
-        HAVING SUM(l.revenue) <> 0
-        ORDER BY revenue DESC
-    """, params)
+    )
+    SELECT (SELECT COUNT(*) FROM bike_sales) AS bike_transactions,
+           (SELECT COUNT(DISTINCT sale_id) FROM attached WHERE revenue > 0) AS transactions_with_attachment,
+           (SELECT COALESCE(SUM(revenue), 0) FROM attached) AS attached_revenue,
+           (SELECT COALESCE(SUM(quantity), 0) FROM attached) AS attached_units
+""", params)
 
-    txns = attach_summary["bike_transactions"] or 0
-    with_attach = attach_summary["transactions_with_attachment"] or 0
-    attach_stats = stats_html([
-        {"label": "Bike sales", "value": f"{txns:,.0f}"},
-        {"label": "With accessory", "value": pct(with_attach / txns * 100 if txns else 0), "color": "var(--acc-700)",
-         "foot": f"{with_attach:,.0f} of {txns:,.0f}"},
-        {"label": "Attached revenue", "value": zar(attach_summary["attached_revenue"]),
-         "foot": f"{attach_summary['attached_units']:,.0f} units"},
-        {"label": "Per bike", "value": zar(attach_summary["attached_revenue"] / txns if txns else 0)},
-    ])
-    attach_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-                    pct(margin_of(r["gross_profit"], r["revenue"]))]
-                   for _, r in attach_by_cat.head(6).iterrows()]
-    attach_table = html_table(["Attached category", "Units", "Revenue", "GP", "Margin"], attach_rows,
-                               name_col=0, empty_text="No attached sales in this period.")
-    st.markdown(frame("Accessory attach rate on bike sales", "Same transaction", attach_stats + attach_table),
-                unsafe_allow_html=True)
-
-# ---------------------------------------------------------------- page 2 divider
-
-st.markdown(
-    f'<div class="p2head"><h2>Sales Dashboard — breakdowns</h2>'
-    f'<div class="meta">Specialized Paarl &middot; {esc(preset)}</div></div>',
-    unsafe_allow_html=True,
-)
-
-# ---------------------------------------------------------------- top products & discount leakage
-
-top_products = q(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT COALESCE(i.description, '(unknown item)') AS product,
-           COALESCE(c.top_level_name, 'Uncategorised') AS category,
-           SUM(l.quantity) AS units, SUM(l.revenue) AS revenue,
-           SUM(l.revenue) - SUM(l.cogs) AS gross_profit
-    FROM lines l
+attach_by_cat = q(f"""
+    WITH {VALID_SALE_CTE},
+    bike_sales AS (
+        SELECT DISTINCT l.sale_id FROM lines l
+        JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
+    )
+    SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
+           SUM(l.revenue) AS revenue,
+           SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
+           SUM(l.quantity) AS units
+    FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
     LEFT JOIN items i ON i.item_id = l.item_id
     LEFT JOIN categories c ON c.category_id = i.category_id
-    GROUP BY l.item_id
-    ORDER BY revenue DESC LIMIT 10
+    WHERE c.top_level_name IS NULL OR c.top_level_name NOT IN ('BIKE','TURBO')
+    GROUP BY category
+    HAVING SUM(l.revenue) <> 0
+    ORDER BY revenue DESC
 """, params)
-top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-             pct(margin_of(r["gross_profit"], r["revenue"]))]
-            for i, (_, r) in enumerate(top_products.iterrows())]
-top_body = html_table(["#", "Product", "Units", "Revenue", "GP", "Margin"], top_rows,
-                       rank_col=0, name_col=1, empty_text="No sales in this period.")
 
-# Shopify sales breakdown. sales.reference_number_source is Lightspeed's own
-# field, documented as "name of the external system for referenceNumber" on the
-# Sale resource (developers.lightspeedhq.com) — e.g. Shopify or Hubtiger when a
-# sale was pushed in via that integration, blank for a native POS sale.
-#
-# NOTE: an earlier version of this panel queried a sale_lines.source column that
-# does not exist on Lightspeed's API (confirmed against their docs after it came
-# back empty against real data) — this is a SALE-level field, joined in below via
-# sales, not sale_lines. Was added to the sync pipeline (db.js/sync.js) alongside
-# this panel; an OLD snapshot.sqlite predating that fix won't have the column,
-# and a full `npm run sync` (not incremental) is needed once to backfill history.
-sales_cols = set(q("PRAGMA table_info(sales)")["name"])
-if "reference_number_source" not in sales_cols:
-    shopify_body = (
-        '<div class="empty">sales.reference_number_source (Shopify / Hubtiger / native channel) is not '
-        'in this snapshot yet. Run a full <code>npm run sync</code> on the source machine — incremental '
-        "syncs won't backfill historical rows — then <code>npm run snapshot</code> and push.</div>"
-    )
-else:
-    shopify_summary = q1(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
-          COUNT(DISTINCT CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
-          COALESCE(SUM(l.revenue), 0) AS total_revenue
-        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
-    """, params)
-    shopify_gp = shopify_summary["shopify_revenue"] - shopify_summary["shopify_cogs"]
-    shopify_share = (shopify_summary["shopify_revenue"] / shopify_summary["total_revenue"] * 100
-                      if shopify_summary["total_revenue"] else 0)
-    shopify_stats = stats_html([
-        {"label": "Shopify revenue", "value": zar(shopify_summary["shopify_revenue"])},
-        {"label": "Gross profit", "value": zar(shopify_gp)},
-        {"label": "Margin", "value": pct(margin_of(shopify_gp, shopify_summary["shopify_revenue"]))},
-        {"label": "Share of total revenue", "value": pct(shopify_share),
-         "foot": f"{shopify_summary['shopify_transactions']:,.0f} transactions, {shopify_summary['shopify_units']:,.0f} units"},
-    ])
-    shopify_by_cat = q(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-               SUM(l.revenue) AS revenue, SUM(l.revenue) - SUM(l.cogs) AS gross_profit, SUM(l.quantity) AS units
-        FROM lines l
-        JOIN sales s ON s.sale_id = l.sale_id
-        LEFT JOIN items i ON i.item_id = l.item_id
-        LEFT JOIN categories c ON c.category_id = i.category_id
-        WHERE UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY'
-        GROUP BY category
-        HAVING SUM(l.revenue) <> 0
-        ORDER BY revenue DESC
-    """, params)
-    shopify_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-                      pct(margin_of(r["gross_profit"], r["revenue"]))]
-                     for _, r in shopify_by_cat.head(8).iterrows()]
-    shopify_table = html_table(["Category", "Units", "Revenue", "GP", "Margin"], shopify_rows, name_col=0,
-                                empty_text="No Shopify-sourced sales in this period.")
+bike_txns = attach_summary["bike_transactions"] or 0
+with_attach = attach_summary["transactions_with_attachment"] or 0
+attach_rate = (with_attach / bike_txns * 100) if bike_txns else None
 
-    other_channels = q(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT COALESCE(NULLIF(TRIM(s.reference_number_source), ''), 'Lightspeed POS') AS channel,
-               SUM(l.revenue) AS revenue
-        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
-        WHERE UPPER(TRIM(COALESCE(s.reference_number_source, ''))) <> 'SHOPIFY'
-        GROUP BY channel
-        HAVING SUM(l.revenue) <> 0
-        ORDER BY revenue DESC
-    """, params)
-    other_bits = "; ".join(f"{esc(r['channel'])} {zar(r['revenue'])}" for _, r in other_channels.iterrows())
-    other_note = f'<div class="note" style="margin-top:6px">Other channels for context: {other_bits}.</div>' if other_bits else ""
-    shopify_body = shopify_stats + shopify_table + other_note
-
-col3, col4 = st.columns(2, gap="small")
-col3.markdown(frame("Top 10 products", "By revenue", top_body), unsafe_allow_html=True)
-col4.markdown(frame("Shopify sales breakdown", "Online channel", shopify_body), unsafe_allow_html=True)
+# Discount leakage. The A4 design shows this as an Operating health card but the
+# app had no query for it: revenue is already net of discount everywhere else,
+# so the gross list figure has to come back off calc_subtotal. Leakage is
+# measured against gross list revenue (what the goods would have rung up at),
+# not against net revenue — dividing by net would overstate the rate.
+discount = q1(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT
+      COALESCE(SUM(sl.calc_subtotal), 0) AS gross_list,
+      COALESCE(SUM(sl.calc_line_discount + sl.calc_transaction_discount), 0) AS discount_given,
+      COUNT(*) AS line_count,
+      SUM(CASE WHEN (sl.calc_line_discount + sl.calc_transaction_discount) > 0 THEN 1 ELSE 0 END) AS discounted_lines
+    FROM sale_lines sl
+    JOIN valid v ON v.sale_id = sl.sale_id
+""", params)
+leak_pct = (discount["discount_given"] / discount["gross_list"] * 100) if discount["gross_list"] else None
+disc_line_pct = (discount["discounted_lines"] / discount["line_count"] * 100) if discount["line_count"] else None
 
 # ---------------------------------------------------------------- stock (never period-filtered)
 
@@ -1369,6 +1299,7 @@ anchor_row = q1("""
     FROM sales WHERE completed = 1 AND voided = 0
 """)
 anchor = anchor_row["d"] if anchor_row else None
+stock_ready = False
 
 if anchor:
     anchor_date = dt.date.fromisoformat(anchor)
@@ -1456,72 +1387,374 @@ if anchor:
         ORDER BY stock_value DESC
         LIMIT 30
     """, trail_params)
+    stock_ready = True
 
-    stock_stats = stats_html([
-        {"label": "Stock on hand (at cost)", "value": zar(stock_summary["stock_value"]),
-         "foot": f'{stock_summary["stock_units"]:,.0f} units, {stock_summary["stocked_skus"]:,} SKUs'},
-        {"label": "Stock turn (proxy)", "value": f"{turn:.2f}×" if turn else "—",
-         "foot": f"ZAR {compact(trailing_cogs)} COGS / 12m"},
-        {"label": "Weeks of cover", "value": f"{52 / turn:.1f}" if turn else "—", "foot": "At the trailing sales rate"},
-        {"label": "Aged stock (no sales in 12m)", "value": zar(dead_total["value"]), "color": "var(--clay)",
-         "foot": f'{dead_total["skus"]:,} SKUs of capital tied up'},
-    ])
+# ---------------------------------------------------------------- top products & channel
 
+top_products = q(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT COALESCE(i.description, '(unknown item)') AS product,
+           COALESCE(c.top_level_name, 'Uncategorised') AS category,
+           SUM(l.quantity) AS units, SUM(l.revenue) AS revenue,
+           SUM(l.revenue) - SUM(l.cogs) AS gross_profit
+    FROM lines l
+    LEFT JOIN items i ON i.item_id = l.item_id
+    LEFT JOIN categories c ON c.category_id = i.category_id
+    GROUP BY l.item_id
+    ORDER BY revenue DESC LIMIT 10
+""", params)
+top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
+             pct(margin_of(r["gross_profit"], r["revenue"]))]
+            for i, (_, r) in enumerate(top_products.iterrows())]
+top_body = html_table(["#", "Product", "Units", "Revenue", "Gross profit", "Margin"], top_rows,
+                      rank_col=0, name_col=1, muted_cols=(5,), empty_text="No sales in this period.")
+
+has_source = bool(q1("SELECT COUNT(*) n FROM pragma_table_info('sales') WHERE name='reference_number_source'")["n"])
+if not has_source:
+    shopify_body = (
+        '<div class="empty">Channel data is not in this snapshot — '
+        '<code>reference_number_source</code> is missing from the sales table.</div>'
+    )
+else:
+    shopify_summary = q1(f"""
+        WITH {VALID_SALE_CTE}
+        SELECT
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
+          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
+          COUNT(DISTINCT CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
+          COALESCE(SUM(l.revenue), 0) AS total_revenue
+        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
+    """, params)
+    shopify_gp = shopify_summary["shopify_revenue"] - shopify_summary["shopify_cogs"]
+    shopify_share = (shopify_summary["shopify_revenue"] / shopify_summary["total_revenue"] * 100
+                     if shopify_summary["total_revenue"] else 0)
+    shopify_by_cat = q(f"""
+        WITH {VALID_SALE_CTE}
+        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
+               SUM(l.revenue) AS revenue, SUM(l.revenue) - SUM(l.cogs) AS gross_profit, SUM(l.quantity) AS units
+        FROM lines l
+        JOIN sales s ON s.sale_id = l.sale_id
+        LEFT JOIN items i ON i.item_id = l.item_id
+        LEFT JOIN categories c ON c.category_id = i.category_id
+        WHERE UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY'
+        GROUP BY category
+        HAVING SUM(l.revenue) <> 0
+        ORDER BY revenue DESC
+    """, params)
+    shopify_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
+                     pct(margin_of(r["gross_profit"], r["revenue"]))]
+                    for _, r in shopify_by_cat.head(10).iterrows()]
+    shopify_body = (
+        stats_html([
+            {"label": "Shopify revenue", "value": money(shopify_summary["shopify_revenue"])},
+            {"label": "Gross profit", "value": money(shopify_gp)},
+            {"label": "Margin", "value": pct(margin_of(shopify_gp, shopify_summary["shopify_revenue"]))},
+            {"label": "Share of revenue", "value": pct(shopify_share),
+             "foot": f"{shopify_summary['shopify_transactions']:,.0f} transactions, "
+                     f"{shopify_summary['shopify_units']:,.0f} units"},
+        ])
+        + html_table(["Category", "Units", "Revenue", "Gross profit", "Margin"], shopify_rows,
+                     name_col=0, muted_cols=(4,), empty_text="No Shopify-sourced sales in this period.")
+    )
+
+# ---------------------------------------------------------------- bike model drill-down
+#
+# The design's page-2 bar list, kept navigable. Its top level IS the designed
+# view, so the sheet itself stays pure output and every control that drives it
+# sits in the screen-only bar above the document — the same principle the
+# design applies to the period filter.
+
+if "drill_model" not in st.session_state:
+    st.session_state.drill_model = None
+    st.session_state.drill_trim = None
+
+drill_bar = st.container()
+with drill_bar:
+    st.markdown('<span class="mk-drillbar" style="display:none"></span>', unsafe_allow_html=True)
+    dc = st.columns([4, 4, 3, 3], gap="small", vertical_alignment="center")
+    crumb = " › ".join(filter(None, ["All models", st.session_state.drill_model, st.session_state.drill_trim]))
+    dc[0].markdown(f'<div class="lbl">Bike sales by model</div><div class="crumb">{esc(crumb)}</div>',
+                   unsafe_allow_html=True)
+    with dc[1]:
+        st.markdown('<span class="mk-kind" style="display:none"></span>', unsafe_allow_html=True)
+        kind_filter = st.segmented_control("Form", ["Complete bikes", "All forms"],
+                                           default=st.session_state.get("kind_filter", "Complete bikes"),
+                                           label_visibility="collapsed", key="kind_filter")
+        kind_filter = kind_filter or "Complete bikes"
+
+level = "model"
+drill_params = dict(params)
+where_extra = ""
+if st.session_state.drill_model:
+    where_extra += " AND im.model = :drill_model"
+    drill_params["drill_model"] = st.session_state.drill_model
+    if st.session_state.drill_trim:
+        level = "size"
+        group_expr = "COALESCE(im.size, '(no size recorded)')"
+        if st.session_state.drill_trim == "(no trim recorded)":
+            where_extra += " AND im.trim IS NULL"
+        else:
+            where_extra += " AND im.trim = :drill_trim"
+            drill_params["drill_trim"] = st.session_state.drill_trim
+    else:
+        level = "trim"
+        group_expr = "COALESCE(im.trim, '(no trim recorded)')"
+else:
+    group_expr = "im.model"
+
+kind_clause = "" if kind_filter == "All forms" else "AND im.kind = 'complete'"
+model_df = q(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT {group_expr} AS label,
+           SUM(l.revenue) AS revenue,
+           SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
+           SUM(l.quantity) AS units
+    FROM lines l
+    JOIN item_models im ON im.item_id = l.item_id
+    WHERE im.model IS NOT NULL {kind_clause} {where_extra}
+    GROUP BY label
+    HAVING SUM(l.revenue) <> 0
+    ORDER BY revenue DESC
+""", drill_params)
+
+coverage = q1(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT
+      (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind='complete') AS complete_rev,
+      (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind<>'complete') AS other_rev
+""", params)
+
+model_rows = [{"label": r["label"], "revenue": r["revenue"], "gross_profit": r["gross_profit"]}
+              for _, r in model_df.iterrows()]
+model_shown, model_tot_rev, model_tot_gp = prep_bars(model_rows, limit=10)
+model_body = bars_html(model_shown, model_tot_rev, model_tot_gp,
+                       empty_text="No bike sales in this period.")
+
+with drill_bar:
+    drillable = [r["label"] for r in model_shown if not r["label"].startswith("OTHER (")] if level != "size" else []
+    with dc[2]:
+        if drillable:
+            st.markdown('<span class="mk-drill" style="display:none"></span>', unsafe_allow_html=True)
+            pick = st.selectbox("Drill into", ["Drill into…"] + drillable, label_visibility="collapsed",
+                                key=f"drill_pick_{level}_{st.session_state.drill_model or ''}")
+            if pick != "Drill into…":
+                if level == "model":
+                    st.session_state.drill_model = pick
+                else:
+                    st.session_state.drill_trim = pick
+                st.rerun()
+    with dc[3]:
+        st.markdown('<span class="mk-toggle" style="display:none"></span>', unsafe_allow_html=True)
+        if st.button("Back to all models", key="crumb_all",
+                     disabled=not st.session_state.drill_model, use_container_width=True):
+            st.session_state.drill_model = None
+            st.session_state.drill_trim = None
+            st.rerun()
+
+model_eyebrow = "Complete bikes only" if kind_filter == "Complete bikes" else "All forms"
+if level != "model":
+    model_eyebrow += f" · {esc(crumb)}"
+
+# ---------------------------------------------------------------- footnotes
+
+foot_left = ("Revenue is ex-VAT and net of discounts, counting only completed, non-voided sales — "
+             "the same basis as the Lightspeed sales report.")
+if adj_rev:
+    foot_left += (f" It includes ZAR {money(adj_rev)} of off-Lightspeed sales from Adjustments.xlsx; "
+                  f"Lightspeed alone accounts for ZAR {money(kpis['lightspeed_revenue'])}.")
+
+foot_right = ""
+if kpis["zero_cost_revenue"]:
+    zc_pct = kpis["zero_cost_revenue"] / kpis["revenue"] * 100 if kpis["revenue"] else 0
+    foot_right = (f"ZAR {money(kpis['zero_cost_revenue'])} of revenue ({pct(zc_pct)}) carries no unit cost — "
+                  "service and labour lines legitimately have no COGS, which is why Service Centre, "
+                  "Paarl Trails and Retul show margins near 100%.")
+if stock_ready:
+    foot_right += (" Stock turn is a proxy (COGS ÷ closing stock at cost) and is a point-in-time position, "
+                   "never period-filtered.")
+foot_right += " Category, model, stock and channel detail continue on the sheets that follow."
+
+TOTAL_SHEETS = 4 if stock_ready else 3
+
+# ================================================================== SHEET 1
+#
+# Rendered as one markdown block. Nothing on this sheet is interactive, so it
+# needs no Streamlit widgets, and a single block is both exact and cheap.
+
+st.markdown(
+    f'''<div class="sheet s1">
+  <div class="band">
+    <div>
+      <div class="eyebrow">Specialized Paarl · Lightspeed Retail</div>
+      <h1>Sales Dashboard</h1>
+      <div class="period">{period_label} · ZAR, ex-VAT and net of discounts</div>
+    </div>
+    <div class="bandright">
+      <div class="txt">
+        <div class="eyebrow">Page 1 of {TOTAL_SHEETS} · Performance</div>
+        <div class="synced">{esc(synced_text)}</div>
+        <div class="counts">{counts_text}</div>
+      </div>
+      {logo_img()}
+    </div>
+  </div>
+  <div class="inner">
+    {kpi_strip([
+        {"label": "Revenue", "value": money(kpis["revenue"]),
+         "foot": f'{kpis["transactions"]:,} transactions',
+         "delta": sply_delta(kpis["revenue"], sply["revenue"]) if sply else None},
+        {"label": "Gross profit", "value": money(gp),
+         "foot": f'After {compact(kpis["cogs"])} COGS',
+         "delta": sply_delta(gp, sply["gp"]) if sply else None},
+        {"label": "Gross margin", "value": pct(margin),
+         "foot": "Flattered by zero-COGS service lines",
+         "delta": sply_delta(margin, sply["margin"], is_points=True) if sply else None},
+        {"label": "Average sale", "value": money(avg_sale),
+         "foot": f'{kpis["units"]:,.0f} units sold',
+         "delta": sply_delta(avg_sale, sply["avg"]) if sply else None},
+    ])}
+    <section>
+      {section_header("Sales by category", "Revenue ZAR · margin", "normal")}
+      {cat_body}
+    </section>
+    <section>
+      {section_header("Budget versus actual", budget_meta, "tight")}
+      {budget_body}
+    </section>
+    <section>
+      {section_header("Operating health", "Stock is a point-in-time position", "loose")}
+      <div class="cards">
+        {stat_card("Accessory attach", pct(attach_rate),
+                   f'{with_attach:,} of {bike_txns:,} bike sales',
+                   [{"label": "Attached revenue", "value": money(attach_summary["attached_revenue"])},
+                    {"label": "Per bike sold",
+                     "value": money(attach_summary["attached_revenue"] / bike_txns if bike_txns else 0)}])}
+        {stat_card("Discount leakage", pct(leak_pct), "of gross list revenue",
+                   [{"label": "Discount given", "value": money(discount["discount_given"])},
+                    {"label": "Lines discounted", "value": pct(disc_line_pct)}],
+                   figure_colour="var(--clay)")}
+        {stat_card("Stock and turn",
+                   f"{turn:.1f}×" if stock_ready and turn else "—",
+                   f"{52 / turn:.1f} weeks of cover" if stock_ready and turn else "No stock snapshot",
+                   [{"label": "Stock at cost",
+                     "value": money(stock_summary["stock_value"]) if stock_ready else "—"},
+                    {"label": "Aged, no 12m sales",
+                     "value": money(dead_total["value"]) if stock_ready else "—",
+                     "colour": "var(--clay)"}])}
+      </div>
+    </section>
+  </div>
+</div>''',
+    unsafe_allow_html=True,
+)
+
+# ================================================================== SHEET 2
+
+st.markdown(
+    f'''<div class="sheet sn">
+  {page_header("Where the revenue comes from", f"Specialized Paarl · Page 2 of {TOTAL_SHEETS}")}
+  <section>
+    {section_header("Bike sales by model", model_eyebrow, "tight", level=3)}
+    {model_body}
+  </section>
+  <section>
+    {section_header("Top 10 products by revenue", "ZAR, ex-VAT net of discounts", "sub", level=3)}
+    {top_body}
+  </section>
+  <footer class="notes">
+    <div>{foot_left}</div>
+    <div>{foot_right}</div>
+  </footer>
+</div>''',
+    unsafe_allow_html=True,
+)
+
+# ================================================================== SHEET 3
+
+attach_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
+                pct(margin_of(r["gross_profit"], r["revenue"]))]
+               for _, r in attach_by_cat.head(8).iterrows()]
+
+coverage_note = ""
+if kind_filter == "Complete bikes" and coverage["other_rev"]:
+    coverage_note = (f'<div class="note">Complete bikes only: ZAR {money(coverage["complete_rev"])}. '
+                     f'A further ZAR {money(coverage["other_rev"])} of bike-category revenue is framesets, '
+                     'bare frames, build kits and rentals — switch the model list to "All forms" to include it.</div>')
+
+st.markdown(
+    f'''<div class="sheet sn">
+  {page_header("Attach rate and channel", f"Specialized Paarl · Page 3 of {TOTAL_SHEETS}")}
+  <section>
+    {section_header("Accessory attach rate on bike sales", "Same transaction as a complete bike", "sub", level=3)}
+    {stats_html([
+        {"label": "Bike sales", "value": f"{bike_txns:,}"},
+        {"label": "With accessory", "value": pct(attach_rate),
+         "foot": f"{with_attach:,} of {bike_txns:,}"},
+        {"label": "Attached revenue", "value": money(attach_summary["attached_revenue"]),
+         "foot": f'{attach_summary["attached_units"]:,.0f} units'},
+        {"label": "Per bike", "value": money(attach_summary["attached_revenue"] / bike_txns if bike_txns else 0)},
+    ])}
+    {html_table(["Attached category", "Units", "Revenue", "Gross profit", "Margin"], attach_rows,
+                name_col=0, muted_cols=(4,), empty_text="No attached sales in this period.")}
+    {coverage_note}
+  </section>
+  <section>
+    {section_header("Shopify sales breakdown", "Online channel", "sub", level=3)}
+    {shopify_body}
+  </section>
+</div>''',
+    unsafe_allow_html=True,
+)
+
+# ================================================================== SHEET 4
+
+if stock_ready:
     stock_cat_rows = []
-    for _, r in stock_by_cat.head(7).iterrows():
+    for _, r in stock_by_cat.head(8).iterrows():
         t = r["trailing_cogs"] / r["stock_value"] if r["stock_value"] else None
         stock_cat_rows.append([
             r["category"], f'{r["qoh"]:,.0f}', money(r["stock_value"]), money(r["trailing_cogs"]),
             f"{t:.1f}×" if t else "—", f"{52 / t:.1f}" if t else "—",
         ])
-    stock_cat_table = html_table(["Category", "Units held", "At cost", "12m COGS", "Turn", "Weeks"],
-                                  stock_cat_rows, name_col=0)
 
     cover_rows = []
-    for _, r in bike_cover.head(8).iterrows():
+    for _, r in bike_cover.head(10).iterrows():
         sold = r["trailing_gross_units"] or 0
         weeks = (r["qoh"] * 52 / sold) if sold > 0 else None
         weeks_cell = "no sales in 12m" if weeks is None else f"{weeks:.1f}"
         if weeks is None or weeks > 40:
             weeks_cell = Raw(f'<span style="color:var(--clay)">{esc(weeks_cell)}</span>')
         cover_rows.append([r["label"], f'{r["qoh"]:,.0f}', money(r["stock_value"]), f"{sold:,.0f}", weeks_cell])
-    cover_table = html_table(["Model / size", "Units held", "At cost", "12m sold", "Weeks cover"],
-                              cover_rows, name_col=0)
 
-    stock_body = (
-        stock_stats
-        + '<div class="two">'
-        + f'<div><div class="meta" style="margin-bottom:3px">By category</div>{stock_cat_table}</div>'
-        + f'<div><div class="meta" style="margin-bottom:3px">Bike cover by model and size</div>{cover_table}</div>'
-        + '</div>'
-    )
     st.markdown(
-        frame("Stock on hand & stock turn",
-              f"Held now · trade over the 12 months to {anchor} · not period-filtered",
-              stock_body),
+        f'''<div class="sheet sn">
+  {page_header("Stock position", f"Specialized Paarl · Page 4 of {TOTAL_SHEETS}")}
+  <section>
+    {section_header("Stock on hand and stock turn",
+                    f"Held now · trade over the 12 months to {anchor} · not period-filtered",
+                    "sub", level=3)}
+    {stats_html([
+        {"label": "Stock at cost", "value": money(stock_summary["stock_value"]),
+         "foot": f'{stock_summary["stock_units"]:,.0f} units, {stock_summary["stocked_skus"]:,} SKUs'},
+        {"label": "Stock turn", "value": f"{turn:.2f}×" if turn else "—",
+         "foot": f"{compact(trailing_cogs)} COGS over 12m"},
+        {"label": "Weeks of cover", "value": f"{52 / turn:.1f}" if turn else "—",
+         "foot": "At the trailing sales rate"},
+        {"label": "Aged stock", "value": money(dead_total["value"]),
+         "colour": "var(--clay)", "foot": f'{dead_total["skus"]:,} SKUs, no sales in 12m'},
+    ])}
+  </section>
+  <section>
+    {section_header("By category", "Units held, cost, turn and weeks of cover", "sub", level=3)}
+    {html_table(["Category", "Units held", "At cost", "12m COGS", "Turn", "Weeks"],
+                stock_cat_rows, name_col=0)}
+  </section>
+  <section>
+    {section_header("Bike cover by model and size", "Complete bikes held now", "sub", level=3)}
+    {html_table(["Model / size", "Units held", "At cost", "12m sold", "Weeks cover"],
+                cover_rows, name_col=0)}
+  </section>
+</div>''',
         unsafe_allow_html=True,
     )
-
-# ---------------------------------------------------------------- footer notes
-
-note_bits = ["Revenue is ex-VAT and net of discounts, counting only completed, non-voided sales — the same basis as the "
-             "Lightspeed sales report."]
-if adj_rev:
-    note_bits.append(f"Includes {zar(adj_rev)} from Adjustments.xlsx (sales made outside Lightspeed); "
-                      f"Lightspeed alone accounts for {zar(kpis['lightspeed_revenue'])}.")
-if kpis["zero_cost_revenue"]:
-    note_bits.append(
-        f"{zar(kpis['zero_cost_revenue'])} of revenue ({pct(kpis['zero_cost_revenue'] / kpis['revenue'] * 100 if kpis['revenue'] else 0)}) "
-        "has no unit cost on record — labour and service lines legitimately carry no COGS, which is why service "
-        "categories show margins near 100%. Judge product margin on the goods categories."
-    )
-
-st.markdown(
-    f'''<footer class="notes">
-      <div class="note">{" ".join(note_bits)}</div>
-      <div class="note">Stock turn is a proxy (COGS &divide; closing stock at cost) — Lightspeed exposes only a
-        current snapshot, so the denominator is the closing position rather than a period average. Negative-stock
-        SKUs are excluded from the values above and need correcting in Lightspeed.</div>
-    </footer>''',
-    unsafe_allow_html=True,
-)
