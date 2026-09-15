@@ -910,12 +910,11 @@ def get_adjustments(from_date, to_date):
 # sits ABOVE the document, aligned to the sheet width, and is excluded from
 # print. Everything the sidebar used to do lives here.
 #
-# On the financial year: the design's `Financial YTD` preset assumed a 1 July
-# start, inferred from sales data beginning 1 Jul 2023 and flagged in the
-# handoff as unconfirmed. The budget table is better evidence — it runs
-# 2023-07 to 2027-06, four complete July-to-June years — so 1 July is used
-# here. It is still worth confirming with the shop before the figure is
-# quoted anywhere binding.
+# The financial year runs 1 July to 30 June — confirmed by the shop on
+# 15 September 2026. The design handoff had inferred 1 July from sales data
+# beginning 1 Jul 2023 and flagged it as an open question; it is closed, and
+# the budget table agrees (2023-07 to 2027-06, four complete July-to-June
+# years). `Calendar YTD` is a separate preset precisely because it does not.
 FY_START_MONTH = 7
 
 
