@@ -22,16 +22,37 @@ Off-Lightspeed Adjustments are included in headline figures and always
 disclosed separately, since the Lightspeed-only figure is what ties to the
 shop's own report.
 
+The report is two A4 pages and only two: the month in review, then the
+financial year to date. Both carry the same five things — three performance
+figures against the same period last year, a budget card, a category
+overview, the Shopify channel, and the top ten sellers — over a different
+window, so they are built by one function and differ only in the dates handed
+to it. Attach rate and stock position are standing operational analyses
+rather than a period result, so they sit on appendix sheets that are off the
+printed document unless the control bar asks for them.
+
+Scope: every figure on both pages covers the budgeted categories plus
+Wheelsets, and nothing else. That is what lets the budget column mean
+something — revenue including categories nobody budgeted for cannot be
+compared with a budget that excludes them. Wheelsets is reported alongside
+the budgeted categories with an empty budget rather than dropped; whatever
+falls outside the scope is quantified in each page footer rather than lost.
+
+Category, Shopify and top-ten rows open in place: a category into its
+subcategories and then into the items and sizes beneath them, the top ten by
+range into model and size. The drill-downs are <details> elements, so they
+cost no rerun and no server round trip — and the print stylesheet shuts every
+one of them, which is what keeps the printed report exactly two pages
+however far it has been explored on screen.
+
 Visual design ported from index.html (the Node app's dashboard front end):
 same type system (Barlow / Barlow Condensed), same colour discipline (steel
 navy is the only series colour; clay is reserved EXCLUSIVELY for unfavourable
-values and is never decorative), same panel/table/bar conventions. Streamlit
-renders one continuous scrolling page rather than the two fixed print pages
-index.html paginates to — there is no print-CSS equivalent for a Streamlit
-app — but every panel, KPI tile, bar list and table is rebuilt to match.
-Native Streamlit chrome that cannot be fully re-skinned (the period-preset
-and item-form radios, the date pickers) is restyled as closely as Streamlit's
-own component internals allow.
+values and is never decorative), same panel and table conventions. The one
+addition is a favourable green, used only where a figure is read as a
+pass/fail against budget. Native Streamlit chrome that cannot be fully
+re-skinned (the period selects, the checkbox) is restyled as closely as
+Streamlit's own component internals allow.
 """
 import base64
 import html as html_lib
@@ -119,6 +140,12 @@ STYLE = """
      carries meaning rather than style: unfavourable values ONLY (negative
      variance, discount leakage, aged stock). Never decorative. */
   --clay:              #8c1f34;
+  /* Its favourable twin. The original design had no "good" colour because the
+     only signed figure on the sheet was a variance, drawn in accent navy when
+     it was not clay. The budget card and the two variance columns are read as
+     a pass/fail at a glance, so they get a green rather than a navy — the one
+     place in the report where hue, not just weight, carries the verdict. */
+  --good:              #1f6b45;
   --font-heading:      "Barlow Condensed", system-ui, sans-serif;
   --font-body:         "Barlow", system-ui, sans-serif;
 }
@@ -165,9 +192,15 @@ h1, h2, h3 { font-family: var(--font-heading); }
 }
 /* Page 1 is full-bleed at the top (the band runs edge to edge), so the sheet
    itself carries no top or side padding — the inner wrapper does. */
-.sheet.s1 { padding: 0 0 26px; gap: 20px; }
-.sheet.s1 .inner { padding: 0 40px; display: flex; flex-direction: column; gap: 20px; }
+.sheet.s1 { padding: 0 0 22px; gap: 16px; }
+.sheet.s1 .inner { padding: 0 40px; display: flex; flex-direction: column; gap: 14px; }
 .sheet.sn { padding: 30px 40px 20px; gap: 22px; }
+/* Page 2 is the same compact sheet as page 1 without the full-bleed band, so
+   it wears .s1's densities and only replaces the band with its own header. */
+.sheet.s1.s2 { padding-top: 24px; }
+/* The inner wrapper has to take the sheet's spare height for the methodology
+   footer's margin-top:auto to have anything to push against. */
+.sheet.s1 .inner { flex: 1; }
 
 /* ---------- header band (page 1, full bleed) ---------- */
 .band {
@@ -218,13 +251,13 @@ h1, h2, h3 { font-family: var(--font-heading); }
   border-bottom: 1px solid var(--color-neutral-500);
 }
 .sh h2, .sh h3 {
-  font-family: var(--font-heading); font-size: 19px; margin: 0;
+  font-family: var(--font-heading); font-size: 17px; margin: 0;
   letter-spacing: 0.01em; font-weight: 600;
 }
 .sh .eyebrow { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-600); }
 /* Per-section rhythm: the design tunes these individually rather than using
    one value, so the variants are named for the section they belong to. */
-.sh.tight  { padding-bottom: 4px; margin-bottom: 6px; }
+.sh.tight  { padding-bottom: 3px; margin-bottom: 5px; }
 .sh.normal { padding-bottom: 4px; margin-bottom: 8px; }
 .sh.loose  { padding-bottom: 5px; margin-bottom: 10px; }
 .sh.sub    { padding-bottom: 5px; margin-bottom: 6px; }
@@ -330,13 +363,94 @@ th.vbarh { text-align: center !important; padding-left: 14px !important; }
 .card .subs span:first-child { color: var(--color-neutral-700); }
 .card .subs span:last-child { font-variant-numeric: tabular-nums; }
 
+/* ---------- metric cards (the four figures heading each review page) ----------
+   Three performance figures plus the budget card, each carrying one
+   sub-heading: the same measure a year earlier, or the variance against
+   budget. One row, four equal columns, so the figures share a baseline. */
+.mcards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+/* The Shopify pair. Two cards, so they get a smaller figure than the four that
+   head the page — a channel worth a fraction of the shop should not carry the
+   same visual weight as the shop's own revenue. */
+.mcards.two { grid-template-columns: repeat(2, 1fr); margin-bottom: 7px; }
+.mcards.two .mcard .fig { font-size: 19px; }
+.mcard { border: 1px solid var(--color-divider); padding: 7px 11px 9px; }
+.mcard .t {
+  font-family: var(--font-heading); font-size: 11.5px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--color-accent-800);
+}
+.mcard .fig {
+  font-family: var(--font-heading); font-size: 24px; line-height: 1.06;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 4px;
+}
+.mcard .sub { font-size: 10.5px; color: var(--color-neutral-700); margin-top: 4px; line-height: 1.3; }
+.mcard .sub .n { font-variant-numeric: tabular-nums; }
+
+/* ---------- drill-down tables ----------
+   A CSS grid rather than a <table>, because the rows nest: a category opens
+   into its subcategories, a subcategory into its items. <details> cannot be a
+   child of <tbody>, but it can be a child of a grid container, and every row
+   at every depth shares one column template through the inherited --dtcols
+   custom property, so the columns stay aligned down the whole tree.
+
+   Collapsed is the printable state. The sheet is a fixed page box, so an
+   opened branch would spill past the paper; on screen the sheet grows to fit
+   (see .sheet:has(details[open]) below) and in print every branch is forced
+   shut again, which is what keeps the report exactly two pages however far
+   it has been explored. */
+.dt2 { width: 100%; }
+.dt2 .r { display: grid; grid-template-columns: var(--dtcols); align-items: center; }
+.dt2 .r > div {
+  padding: 2px 6px; text-align: right; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dt2 .r > div.nm { text-align: left; font-variant-numeric: normal; }
+.sheet.s1 .dt2 { font-size: 11.5px; }
+.sheet.sn .dt2 { font-size: 12.5px; }
+.dt2 .hd { border-bottom: 1px solid var(--color-neutral-500); }
+.dt2 .hd > div {
+  font-family: var(--font-heading); font-weight: 600; font-size: 9.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-600);
+  white-space: normal; line-height: 1.12; padding-bottom: 3px;
+}
+.dt2 .l1 { border-bottom: 1px solid var(--color-neutral-200); }
+.dt2 .l2, .dt2 .l3 { border-bottom: 1px solid rgba(29,31,32,0.07); }
+.dt2 .l2 > div, .dt2 .l3 > div { padding-top: 1.5px; padding-bottom: 1.5px; font-size: 11px; }
+.dt2 .l2 > .nm { padding-left: 22px; }
+.dt2 .l3 > .nm { padding-left: 42px; color: var(--color-neutral-700); }
+.dt2 .kids { background: rgba(29,31,32,0.022); }
+.dt2 .tot {
+  border-top: 1px solid var(--color-neutral-500); border-bottom: 0; font-weight: 600;
+}
+.dt2 .tot > div { padding-top: 5px; }
+.dt2 .tot > .nm {
+  font-family: var(--font-heading); letter-spacing: 0.07em; text-transform: uppercase;
+}
+/* The disclosure control. summary defaults to display:list-item and draws its
+   own marker; both have to go before it can be a grid row, and the caret is
+   redrawn on the name cell so it indents with the level it belongs to. */
+.dt2 summary { list-style: none; cursor: pointer; }
+.dt2 summary::-webkit-details-marker { display: none; }
+.dt2 summary.r > .nm::before {
+  content: "▸"; display: inline-block; width: 9px; font-size: 9px;
+  color: var(--color-neutral-500); margin-right: 4px;
+}
+.dt2 details[open] > summary.r > .nm::before { content: "▾"; }
+.dt2 summary.r:hover { background: rgba(29,31,32,0.05); }
+.dt2 .muted { color: var(--color-neutral-700); }
+
 /* ---------- methodology footer ----------
    margin-top:auto pins it to the bottom of the sheet's flex column. */
 footer.notes {
-  margin-top: auto; border-top: 1px solid var(--color-divider); padding-top: 8px;
+  margin-top: auto; border-top: 1px solid var(--color-divider); padding-top: 7px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
-  font-size: 10.5px; line-height: 1.5; color: var(--color-neutral-700);
+  font-size: 9.5px; line-height: 1.45; color: var(--color-neutral-700);
 }
+
+/* An opened drill-down needs room the fixed page box does not have. Rather
+   than clip it (the sheet's overflow:hidden is there so an oversized section
+   is visibly caught during review) the sheet becomes auto-height for as long
+   as anything inside it is open, and snaps back when it is closed again. */
+.sheet:has(details[open]) { height: auto; min-height: 1123px; overflow: visible; }
 
 .empty { color: var(--color-neutral-600); font-size: 12px; padding: 14px 0; text-align: center; }
 .stack { display: flex; flex-direction: column; gap: 22px; }
@@ -353,58 +467,26 @@ a:hover { color: var(--color-accent-900); }
    holds that marker, which is what keeps it from also matching every
    ancestor block up to the page root.
    ===================================================================== */
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-ctrlbar),
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-drillbar) {
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-ctrlbar) {
   max-width: 794px; margin: 0 auto 14px; background: #fff;
   border: 1px solid var(--color-divider); padding: 10px 14px;
   font-family: var(--font-body); gap: 8px !important;
 }
-.lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); }
-.cur { font-family: var(--font-heading); font-size: 16px; color: var(--color-accent-900); line-height: 1.25; }
-.crumb { font-family: var(--font-heading); font-size: 16px; color: var(--color-accent-900); line-height: 1.25; }
-.ctrlrule { border-top: 1px solid var(--color-divider); margin: 4px -14px 8px; }
-.ctrlnote { font-size: 11px; color: var(--color-neutral-700); line-height: 1.45; }
-/* The coverage caveat under the attach table, at the design's footnote scale. */
+.lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); margin-bottom: 4px; }
+/* The coverage caveat under the appendix tables, at the design's footnote scale. */
 .note { font-size: 10.5px; line-height: 1.5; color: var(--color-neutral-700); margin-top: 8px; }
 
-/* Streamlit's own widgets, dragged into the design's visual language. Each
-   block is scoped by marker adjacency: an invisible <span> marker is emitted
-   immediately before the widget, and the rule targets the element container
-   that FOLLOWS the one holding the marker. Streamlit gives its widgets no
-   stable class of their own, so this is the only way to style one widget
-   without styling every widget on the page. */
-div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"],
-div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] [role="radiogroup"] {
-  display: flex !important; gap: 7px !important; flex-wrap: wrap;
-}
-div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button,
-div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button {
-  border-radius: 0 !important; padding: 7px 12px !important; min-height: 0 !important;
-  background: #fff !important; border: 1px solid var(--color-neutral-400) !important;
-  font-family: var(--font-body) !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button p,
-div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button p {
-  font-size: 12px !important; color: var(--color-accent-800) !important; line-height: 1.1;
-}
-div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"],
-div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] {
-  background: var(--color-accent-800) !important; border-color: var(--color-accent-800) !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-preset) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] p,
-div[data-testid="stElementContainer"]:has(.mk-kind) + div[data-testid="stElementContainer"] [data-testid="stButtonGroup"] button[aria-checked="true"] p {
-  color: #fff !important;
-}
-
-/* Print to PDF is the filled button; the two outlined ones are Change period
-   and Back to all models. */
-div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button,
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button {
+/* Streamlit's own widgets, dragged into the design's visual language. The
+   button is scoped by marker adjacency: an invisible <span> marker is emitted
+   immediately before it, and the rule targets the element container that
+   FOLLOWS the one holding the marker. Streamlit gives its widgets no stable
+   class of their own, so this is the only way to style one widget without
+   styling every widget on the page. The selects and the checkbox are reached
+   through their own stable data-testid instead. */
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button {
   font-family: var(--font-body) !important; font-size: 11px !important; letter-spacing: 0.1em;
   text-transform: uppercase; padding: 8px 12px !important; border-radius: 0 !important;
   min-height: 0 !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button {
   background: var(--color-accent-800) !important; border: 1px solid var(--color-accent-800) !important;
 }
 div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button p {
@@ -413,20 +495,19 @@ div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElemen
 div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button:hover {
   background: var(--color-accent-900) !important; border-color: var(--color-accent-900) !important;
 }
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button {
-  background: #fff !important; border: 1px solid var(--color-neutral-400) !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button p {
-  font-size: 11px !important; color: var(--color-accent-800) !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:hover {
-  background: var(--color-accent-900) !important; border-color: var(--color-accent-900) !important;
-}
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:hover p { color: #fff !important; }
-div[data-testid="stElementContainer"]:has(.mk-toggle) + div[data-testid="stElementContainer"] button:disabled p { color: var(--color-neutral-400) !important; }
 
-div[data-testid="stTextInputRootElement"], div[data-baseweb="input"], div[data-baseweb="select"] > div {
+div[data-testid="stTextInputRootElement"], div[data-baseweb="input"], div[data-baseweb="select"] > div,
+div[data-testid="stSelectbox"] .react-aria-ComboBox [role="group"] {
   border-radius: 0 !important; background: #fff !important; box-shadow: none !important;
+  border: 1px solid var(--color-neutral-400) !important;
+}
+div[data-testid="stSelectbox"] input {
+  font-family: var(--font-body) !important; font-size: 13px !important;
+  color: var(--color-accent-900) !important;
+}
+div[data-testid="stCheckbox"] [data-testid="stMarkdownContainer"] p {
+  font-family: var(--font-body) !important; font-size: 12px !important;
+  color: var(--color-accent-800) !important;
 }
 div[data-testid="stElementContainer"]:has(div[data-testid="stTextInput"]) {
   max-width: 794px; margin: 0 auto;
@@ -469,13 +550,23 @@ div[data-testid="stElementContainer"]:has(div[data-testid="stTextInput"]) {
 
   [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stToolbar"],
   [data-testid="stMainMenu"], .screen-only, .no-print { display: none !important; }
-  /* The two control bars are st.container()s, not markup we can hang a
-     .screen-only class on, so they are hidden through the same marker-scoped
-     selector that styles them. Left visible they occupy real height above the
-     first sheet and push the document onto a fifth page. */
+  /* The control bar is an st.container(), not markup we can hang a
+     .screen-only class on, so it is hidden through the same marker-scoped
+     selector that styles it. Left visible it occupies real height above the
+     first sheet and pushes the document onto a third page. */
   div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-ctrlbar),
-  div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mk-drillbar),
   [data-testid="stIFrame"], iframe { display: none !important; }
+
+  /* The printed report is the collapsed report, always. A branch left open on
+     screen would push its sheet past the paper and fragment onto a third page,
+     so the page box is re-asserted and every drill-down is shut for print —
+     the two sheets print identically no matter how far they were explored. */
+  .dt2 details > .kids { display: none !important; }
+  .dt2 summary.r > .nm::before { display: none !important; }
+  .sheet { height: 1123px !important; min-height: 0 !important; overflow: hidden !important; }
+  /* The appendix is analysis that sits beside the report rather than in it. It
+     is off the printed document unless the control bar asks for it. */
+  .sheet.appendix { display: none !important; }
 
   /* One .sheet, one sheet of paper. */
   .sheet {
@@ -659,21 +750,6 @@ def margin_of(gp, rev):
     return (gp / rev * 100) if rev else None
 
 
-def sply_delta(curr, prior, is_points=False):
-    """Mirrors splyText() in index.html — signed delta text + colour, or None."""
-    if prior is None or (isinstance(prior, float) and pd.isna(prior)):
-        return None
-    if not is_points and not prior:
-        return None
-    d = (curr - prior) if is_points else (curr - prior) / abs(prior) * 100
-    if d is None or pd.isna(d):
-        return None
-    sign = "+" if d >= 0 else "−"
-    suffix = "pp" if is_points else "%"
-    colour = "var(--color-accent-800)" if d >= 0 else "var(--clay)"
-    return f"{sign}{abs(d):.1f}{suffix} vs SPLY", colour
-
-
 # ---------------------------------------------------------------- HTML builders
 #
 # Every builder below emits the markup of the approved A4 design, class-for-
@@ -695,86 +771,6 @@ def section_header(title, eyebrow="", rhythm="normal", level=2):
 def page_header(title, eyebrow):
     """Pages 2+. Note the 2px rule — deliberately heavier than section rules."""
     return f'<div class="ph2"><h2>{esc(title)}</h2><div class="eyebrow">{esc(eyebrow)}</div></div>'
-
-
-def kpi_strip(cells):
-    """Four cells divided by hairlines, ruled above and below.
-
-    Each cell is eyebrow -> figure -> caption. The SPLY comparison, which the
-    A4 design has no slot of its own for, is appended to the caption so the
-    comparison survives without adding a row to the strip.
-    """
-    out = []
-    for c in cells:
-        # Caption and comparison sit on their own lines rather than being joined
-        # with a separator. Joined, the line wraps at whatever point the cell
-        # width happens to fall — leaving "vs SPLY" orphaned on line three in
-        # some cells and not others, so the four figures no longer sit on a
-        # common baseline. One line each keeps the strip a predictable height.
-        foot_html = ""
-        if c.get("foot"):
-            foot_html += f'<div class="f">{esc(c["foot"])}</div>'
-        if c.get("delta"):
-            text, colour = c["delta"]
-            foot_html += f'<div class="f" style="color:{colour}">{esc(text)}</div>'
-
-        out.append(f'<div class="kpi"><div class="k">{esc(c["label"])}</div>'
-                   f'<div class="v">{esc(c["value"])}</div>{foot_html}</div>')
-    return f'<div class="kpis">{"".join(out)}</div>'
-
-
-def bar_fill_colour(i):
-    """Rank 1 darkest, 2-3 mid, 4+ light — the design's fixed three-step ramp."""
-    return ("var(--color-accent-800)" if i == 0
-            else "var(--color-accent-600)" if i < 3
-            else "var(--color-accent-400)")
-
-
-def prep_bars(rows, limit=10):
-    """Totals over EVERY row, then cap the display — the total still reconciles."""
-    total_rev = sum(r["revenue"] for r in rows)
-    total_gp = sum(r["gross_profit"] for r in rows)
-    if limit and len(rows) > limit:
-        head, rest = rows[:limit - 1], rows[limit - 1:]
-        rows = head + [{
-            "label": f"OTHER ({len(rest)})",
-            "revenue": sum(r["revenue"] for r in rest),
-            "gross_profit": sum(r["gross_profit"] for r in rest),
-        }]
-    return rows, total_rev, total_gp
-
-
-def bars_html(rows, total_rev, total_gp, empty_text="No sales in this period."):
-    """Bar list plus totals row.
-
-    Bar width is value / max(value) — proportional to the largest row, not to
-    the total, so the leader always fills the track. A negative row gets no
-    track behind it (a fill growing leftward from zero would misread as a
-    positive bar) and a clay value instead.
-    """
-    if not rows:
-        return f'<div class="empty">{esc(empty_text)}</div>'
-    max_rev = max([r["revenue"] for r in rows] + [1])
-    parts = []
-    for i, r in enumerate(rows):
-        label = esc(r["label"])
-        rev, gp = r["revenue"], r["gross_profit"]
-        width = max(0.0, rev / max_rev * 100) if max_rev else 0.0
-        track_bg = "transparent" if rev < 0 else "var(--color-neutral-200)"
-        val_style = ' style="color:var(--clay)"' if rev < 0 else ""
-        parts.append(
-            f'<div class="brow"><div class="nm" title="{label}">{label}</div>'
-            f'<div class="track" style="background:{track_bg}">'
-            f'<div class="fill" style="width:{width:.2f}%;background:{bar_fill_colour(i)}"></div></div>'
-            f'<div class="rv"{val_style}>{money(rev)}</div>'
-            f'<div class="mg">{pct(margin_of(gp, rev))}</div></div>'
-        )
-    parts.append(
-        f'<div class="brow total"><div class="nm">Total</div><div></div>'
-        f'<div class="rv">{money(total_rev)}</div>'
-        f'<div class="mg">{pct(margin_of(total_gp, total_rev))}</div></div>'
-    )
-    return "".join(parts)
 
 
 def html_table(headers, rows, name_col=None, rank_col=None, muted_cols=(),
@@ -808,81 +804,9 @@ def html_table(headers, rows, name_col=None, rank_col=None, muted_cols=(),
     return f'<table class="dt"><thead><tr>{thead}</tr></thead><tbody>{"".join(body)}</tbody></table>'
 
 
-def budget_summary(budget_total, actual_total, variance, variance_pct):
-    """Budget / Actual / Variance, divided by hairlines. Variance in clay when
-    under budget, accent when at or over."""
-    colour = "var(--clay)" if variance < 0 else "var(--color-accent-800)"
-    sign = "+" if variance >= 0 else "−"
-    vpct_text = "" if variance_pct is None or pd.isna(variance_pct) else \
-        f" · {sign}{abs(variance_pct):.1f}%"
-    return (
-        '<div class="bsum">'
-        f'<div><div class="k">Budget</div><div class="v">{money(budget_total)}</div></div>'
-        f'<div><div class="k">Actual</div><div class="v">{money(actual_total)}</div></div>'
-        f'<div><div class="k">Variance</div><div class="v" style="color:{colour}">'
-        f'{sign}{money(abs(variance))}{vpct_text}</div></div>'
-        '</div>'
-    )
-
-
-def budget_table_html(rows):
-    """Category table with the diverging under/over bar.
-
-    The bar saturates at +/-25%: a category 80% over budget and one 30% over
-    both render as a full bar, and the signed figure beside it carries the
-    exact value. Without the clamp a single wild category flattens every other
-    bar to invisibility.
-    """
-    ths = (
-        '<th class="name">Category</th><th>Budget</th><th>Actual</th>'
-        '<th class="vbarh">Under · over</th><th>Variance</th>'
-    )
-    trs = []
-    for r in rows:
-        vpct = r["variance_pct"]
-        w = min(100.0, abs(vpct or 0) / 25 * 100)
-        neg_w = w if r["variance"] < 0 else 0.0
-        pos_w = w if r["variance"] >= 0 else 0.0
-        bar = (
-            '<div class="vwrap">'
-            f'<div class="vneg"><div style="width:{neg_w:.1f}%"></div></div>'
-            f'<div class="vpos"><div style="width:{pos_w:.1f}%"></div></div>'
-            '</div>'
-        )
-        colour = "var(--color-accent-800)" if r["variance"] >= 0 else "var(--clay)"
-        if vpct is None or pd.isna(vpct):
-            pct_text = "—"
-        else:
-            pct_text = f'{"+" if r["variance"] >= 0 else chr(0x2212)}{abs(vpct):.1f}%'
-        trs.append(
-            f'<tr><td class="name">{esc(r["category"])}</td>'
-            f'<td class="muted">{money(r["budget"])}</td><td>{money(r["actual"])}</td>'
-            f'<td class="vbar">{bar}</td>'
-            f'<td style="color:{colour}">{pct_text}</td></tr>'
-        )
-    return f'<table class="dt"><thead><tr>{ths}</tr></thead><tbody>{"".join(trs)}</tbody></table>'
-
-
-def stat_card(title, figure, caption, subs, figure_colour=None):
-    """One Operating health card: title, big figure + caption, then label/value
-    sub-rows. `subs` items may carry a "colour" to mark an unfavourable value."""
-    fig_style = f' style="color:{figure_colour}"' if figure_colour else ""
-    sub_html = "".join(
-        f'<div><span>{esc(s["label"])}</span>'
-        f'<span{f" style=\"color:{s["colour"]}\"" if s.get("colour") else ""}>{esc(s["value"])}</span></div>'
-        for s in subs
-    )
-    return (
-        f'<div class="card"><div class="t">{esc(title)}</div>'
-        f'<div class="figrow"><div class="fig"{fig_style}>{esc(figure)}</div>'
-        f'<div class="cap">{esc(caption)}</div></div>'
-        f'<div class="subs">{sub_html}</div></div>'
-    )
-
-
 def stats_html(items):
-    """A row of small figures, used on the detail sheets where a full card grid
-    would be too heavy. Same type scale as the card's sub-rows."""
+    """A row of small figures, used on the appendix sheets where a full card
+    grid would be too heavy. Same type scale as a card's sub-rows."""
     parts = []
     for it in items:
         style = f' style="color:{it["colour"]}"' if it.get("colour") else ""
@@ -895,32 +819,261 @@ def stats_html(items):
     return f'<div class="bsum">{"".join(parts)}</div>'
 
 
+def metric_card(title, figure, subs, figure_colour=None):
+    """One of the figures heading a review page.
+
+    Title, the figure itself, and one sub-heading line. That line is the same
+    measure a year earlier on the performance cards and the variance against
+    budget on the budget card — one comparison per card, never two, so the
+    cards stay the same height and their figures share a baseline. `subs` is a
+    list of {"text", "colour"} fragments joined by a middle dot.
+    """
+    fig_style = f' style="color:{figure_colour}"' if figure_colour else ""
+    parts = []
+    for s in subs:
+        style = f' style="color:{s["colour"]}"' if s.get("colour") else ""
+        parts.append(f'<span class="n"{style}>{esc(s["text"])}</span>')
+    return (
+        f'<div class="mcard"><div class="t">{esc(title)}</div>'
+        f'<div class="fig"{fig_style}>{esc(figure)}</div>'
+        f'<div class="sub">{" · ".join(parts)}</div></div>'
+    )
+
+
+def cell(value, colour=None, muted=False):
+    """One value cell of a drill-down row."""
+    cls = ' class="muted"' if muted else ""
+    style = f' style="color:{colour}"' if colour else ""
+    return f"<div{cls}{style}>{esc(value)}</div>"
+
+
+def _drill_rows(nodes, depth, cells_fn):
+    """Render one level of the tree, recursing into any node that has children.
+
+    A node with children becomes a <details>; its own figures live in the
+    <summary>, so the row stays readable — and printable — while shut.
+    """
+    out = []
+    for n in nodes:
+        label = esc(n["label"])
+        row = f'<div class="nm" title="{label}">{label}</div>' + cells_fn(n, depth)
+        kids = n.get("children")
+        if kids:
+            out.append(f'<details><summary class="r l{depth}">{row}</summary>'
+                       f'<div class="kids">{_drill_rows(kids, depth + 1, cells_fn)}</div></details>')
+        else:
+            out.append(f'<div class="r l{depth}">{row}</div>')
+    return "".join(out)
+
+
+def drill_table(columns, nodes, cells_fn, total=None, empty_text="Nothing in this period."):
+    """A table whose rows open into their own detail.
+
+    `columns` is [(label, css width), ...] with the name column first; every
+    row at every depth is laid out against that one template, which is handed
+    down the tree as a custom property rather than repeated per level.
+    `cells_fn(node, depth)` renders one row's value cells — depth is passed so
+    a column that only means something at the top level (a budget variance
+    against a category, say) can go quiet further down rather than repeating a
+    number that was never apportioned that far.
+    """
+    if not nodes:
+        return f'<div class="empty">{esc(empty_text)}</div>'
+    template = " ".join(w for _, w in columns)
+    head = (f'<div class="nm">{esc(columns[0][0])}</div>'
+            + "".join(f'<div>{esc(label)}</div>' for label, _ in columns[1:]))
+    tot = ""
+    if total:
+        tot = (f'<div class="r tot"><div class="nm">{esc(total["label"])}</div>'
+               + total["cells"] + "</div>")
+    return (f'<div class="dt2" style="--dtcols:{template}">'
+            f'<div class="r hd">{head}</div>{_drill_rows(nodes, 1, cells_fn)}{tot}</div>')
+
+
 # ---------------------------------------------------------------- adjustments
 
 def get_adjustments(from_date, to_date):
     rows = q("SELECT * FROM adjustments", {})
     if rows.empty:
-        return rows, 0.0, 0.0, 0.0
+        return rows
     if from_date:
         rows = rows[rows["date"] >= from_date.isoformat()]
     if to_date:
         rows = rows[rows["date"] <= to_date.isoformat()]
-    revenue = rows["revenue"].sum()
-    cost = rows["cost"].sum()
-    return rows, revenue, cost, revenue - cost
+    return rows
 
 
-# ---------------------------------------------------------------- screen chrome / period
+# ---------------------------------------------------------------- product naming
 #
-# The A4 design replaces the old filter sidebar with a single control bar that
-# sits ABOVE the document, aligned to the sheet width, and is excluded from
-# print. Everything the sidebar used to do lives here.
+# The top-ten table groups what was sold into Range / Model / Size rather than
+# listing raw descriptions, so that "EPIC 8 COMP M" and "EPIC 8 COMP L" read as
+# two sizes of one model of one range instead of two unrelated products.
+#
+# Bikes already carry that structure: classify-models.js resolved every bike
+# item to a model, trim and size in item_models, and those three fields ARE the
+# three levels. Nothing else in the snapshot does — an accessory is a free-text
+# description and a category path — so for everything else the size is read off
+# the end of the description with the same rules models.js uses for bikes,
+# widened to the sizes accessories actually come in (shoe, waist, sock), and
+# the range falls back to the item's own category leaf. That is why a shoe
+# groups under RECON but a pair of shorts groups under SHORT: the leaf is as
+# specific as the category tree gets for that product.
+ALPHA_SIZES = {"XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL",
+               "XS/S", "S/M", "M/L", "L/XL", "XL/XXL"}
+SIZE_ALIASES = {"SM": "S", "MD": "M", "LG": "L", "LNG": "L"}
+# Diameters, not frame sizes. A description ending "29" names the wheel; read
+# as a size it would invent one that does not exist.
+WHEEL_TOKENS = {"26", "27.5", "29", "650B", "700C", "700"}
+SIZE_NUMERIC = re.compile(r"^\d{1,2}(\.\d+)?$")
+SIZE_PAIRED = re.compile(r"^\d{1,2}(\.\d+)?\s*[/-]\s*\d{1,2}(\.\d+)?$")
+
+
+def _size_token(tok):
+    """Is this trailing token a size? Returns it normalised, or None."""
+    t = SIZE_ALIASES.get(tok, tok)
+    if t in WHEEL_TOKENS:
+        return None
+    if re.fullmatch(r"S[1-6]", t) or t in ALPHA_SIZES or SIZE_PAIRED.fullmatch(t):
+        return t
+    # A bare number is a size only within the range sizes are actually
+    # expressed in — 38-64cm frames, 36-50 shoes, 26-44 waists, kids' 10-24.
+    # Without the ceiling "GARMIN FORERUNNER 965" acquires a size of 965.
+    if SIZE_NUMERIC.fullmatch(t) and 1 <= float(t) <= 70:
+        return t
+    return None
+
+
+def split_size(description):
+    """Split a description into (description without its size, size or None).
+
+    The size is the last token, or the second-to-last where a stray marker
+    follows it — the same two-token window models.py reads bike sizes from.
+    """
+    toks = (description or "").split()
+    for idx in (len(toks) - 1, len(toks) - 2):
+        if idx < 0:
+            continue
+        size = _size_token(toks[idx].upper().strip(",.;"))
+        if size:
+            return " ".join(toks[:idx] + toks[idx + 1:]).strip() or description, size
+    return description, None
+
+
+def text_or_none(value):
+    """A column value as text, or None where there isn't one.
+
+    pandas returns a missing TEXT column as float NaN, and NaN is truthy: a
+    bare `if row["bike_model"]` is True for every accessory in the shop, which
+    is how every non-bike item once ended up grouped under a range named "nan".
+    """
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def product_levels(row):
+    """(range, model, size) for one sold item."""
+    model = text_or_none(row.get("bike_model"))
+    if model:
+        trim = text_or_none(row.get("bike_trim"))
+        return (model, f"{model} {trim}" if trim else model,
+                text_or_none(row.get("bike_size")))
+    stripped, size = split_size(str(row.get("description") or ""))
+    return (text_or_none(row.get("leaf")) or text_or_none(row.get("category")) or "—",
+            stripped, size)
+
+
+# ---------------------------------------------------------------- report scope
+#
+# The report is deliberately narrower than the shop's turnover: every figure on
+# both review pages covers the budgeted categories and Wheelsets, and nothing
+# else. That is what makes the budget column mean something — a revenue total
+# that includes categories nobody budgeted for cannot be compared with a budget
+# that does not. Wheelsets is the one addition: it is a stock-carrying retail
+# category the budget never got a line for, so it is reported alongside the
+# budgeted seven with an empty budget rather than dropped.
+#
+# Everything outside that scope (Paarl Trails, Retül, warranty, retail display,
+# vouchers) is quantified in the footer of each page rather than silently lost.
+EXTRA_CATEGORIES = ["WHEELSET"]
+
+budgeted_categories = sorted(q("SELECT DISTINCT category FROM budget")["category"].tolist())
+report_categories = budgeted_categories + [c for c in EXTRA_CATEGORIES
+                                           if c not in budgeted_categories]
+CAT_PARAMS = {f"cat{i}": c for i, c in enumerate(report_categories)}
+CAT_IN = "(" + ", ".join(f":cat{i}" for i in range(len(report_categories))) + ")"
+
+# Channel. Older snapshots predate the column, so the report degrades to an
+# explanatory empty state rather than failing to load.
+HAS_SOURCE = bool(q1("SELECT COUNT(*) n FROM pragma_table_info('sales') "
+                     "WHERE name='reference_number_source'")["n"])
+SHOPIFY_TEST = ("UPPER(TRIM(COALESCE(s.reference_number_source, ''))) = 'SHOPIFY'"
+                if HAS_SOURCE else "0")
+
+ITEM_SQL = f"""
+WITH {VALID_SALE_CTE}
+SELECT c.top_level_name AS category,
+       CASE WHEN COALESCE(c.discipline_name, '') = '' THEN '(unclassified)'
+            ELSE c.discipline_name END AS subcategory,
+       COALESCE(NULLIF(c.name, ''), c.top_level_name) AS leaf,
+       COALESCE(i.description, '(unknown item)') AS description,
+       im.model AS bike_model, im.trim AS bike_trim, im.size AS bike_size,
+       SUM(l.quantity) AS units,
+       SUM(l.revenue) AS revenue,
+       SUM(l.cogs) AS cogs,
+       SUM(CASE WHEN {SHOPIFY_TEST} THEN l.quantity ELSE 0 END) AS sh_units,
+       SUM(CASE WHEN {SHOPIFY_TEST} THEN l.revenue ELSE 0 END) AS sh_revenue,
+       SUM(CASE WHEN {SHOPIFY_TEST} THEN l.cogs ELSE 0 END) AS sh_cogs
+FROM lines l
+JOIN sales s ON s.sale_id = l.sale_id
+LEFT JOIN items i ON i.item_id = l.item_id
+LEFT JOIN categories c ON c.category_id = i.category_id
+LEFT JOIN item_models im ON im.item_id = l.item_id
+WHERE c.top_level_name IN {CAT_IN}
+GROUP BY l.item_id
+HAVING SUM(l.revenue) <> 0 OR SUM(l.quantity) <> 0
+"""
+
+SCOPE_SQL = f"""
+WITH {VALID_SALE_CTE}
+SELECT COALESCE(SUM(l.revenue), 0) AS all_revenue,
+       COALESCE(SUM(CASE WHEN c.top_level_name IN {CAT_IN} THEN l.revenue ELSE 0 END), 0) AS in_scope,
+       COALESCE(SUM(CASE WHEN c.top_level_name IN {CAT_IN}
+                          AND (l.no_cost_on_record) THEN l.revenue ELSE 0 END), 0) AS zero_cost
+FROM lines l
+LEFT JOIN items i ON i.item_id = l.item_id
+LEFT JOIN categories c ON c.category_id = i.category_id
+"""
+
+# An adjustment names an item by description, so it inherits that item's
+# category, subcategory and — where it is a bike — its model, trim and size.
+# Anything whose description matches no item, or whose item falls outside the
+# report's scope, is left out and disclosed in the page footer.
+ADJ_LOOKUP = q("""
+    SELECT UPPER(TRIM(i.description)) AS key,
+           i.description AS description,
+           c.top_level_name AS category,
+           CASE WHEN COALESCE(c.discipline_name, '') = '' THEN '(unclassified)'
+                ELSE c.discipline_name END AS subcategory,
+           COALESCE(NULLIF(c.name, ''), c.top_level_name) AS leaf,
+           im.model AS bike_model, im.trim AS bike_trim, im.size AS bike_size
+    FROM items i
+    LEFT JOIN categories c ON c.category_id = i.category_id
+    LEFT JOIN item_models im ON im.item_id = i.item_id
+""").drop_duplicates("key").set_index("key")
+
+
+# ---------------------------------------------------------------- periods
+#
+# The report is two reviews of the same shop over two windows: the month, and
+# the financial year so far. Each page carries its own period, each is compared
+# with the same window a year earlier, and both are picked in the control bar
+# above the document — nothing that selects a period is ever printed.
 #
 # The financial year runs 1 July to 30 June — confirmed by the shop on
-# 15 September 2026. The design handoff had inferred 1 July from sales data
-# beginning 1 Jul 2023 and flagged it as an open question; it is closed, and
-# the budget table agrees (2023-07 to 2027-06, four complete July-to-June
-# years). `Calendar YTD` is a separate preset precisely because it does not.
+# 15 September 2026. The budget table agrees (2023-07 to 2027-06, four complete
+# July-to-June years).
 FY_START_MONTH = 7
 
 
@@ -934,43 +1087,14 @@ def shift_year(d, delta):
         return d.replace(month=2, day=28, year=d.year + delta)
 
 
-def financial_ytd(today):
-    year = today.year if today.month >= FY_START_MONTH else today.year - 1
-    return dt.date(year, FY_START_MONTH, 1), today
+def month_end(year, month):
+    return (dt.date(year, month + 1, 1) - dt.timedelta(days=1)) if month < 12 \
+        else dt.date(year, 12, 31)
 
 
-PRESETS = {
-    "All time":       lambda today: (None, None),
-    "Financial YTD":  financial_ytd,
-    "Calendar YTD":   lambda today: (today.replace(month=1, day=1), today),
-    "Month to date":  lambda today: (today.replace(day=1), today),
-    "Last 30 days":   lambda today: (today - dt.timedelta(days=29), today),
-    "Last 90 days":   lambda today: (today - dt.timedelta(days=89), today),
-    "Last 12 months": lambda today: (shift_year(today, -1), today),
-    "Custom":         lambda today: (None, None),
-}
-
-today = dt.date.today()
-if "preset" not in st.session_state:
-    # The report opens on the current financial year, not on all time. The
-    # design defaulted to All time, but this is a periodic report about how
-    # the shop is trading now — an all-time total is a reference figure, not
-    # the headline, and it flattens any recent movement against five years of
-    # history. Every preset, All time included, is one click away.
-    st.session_state.preset = "Financial YTD"
-if "filter_open" not in st.session_state:
-    st.session_state.filter_open = False   # collapsed by default, per the design
-
-# The data window bounds the custom date inputs. Derived from the snapshot
-# rather than hard-coded — the handoff's 2023-07-01 lower bound came from the
-# budget table, not the sales data, and is nearly two and a half years late.
-bounds = q1("""
-    SELECT substr(MIN(COALESCE(complete_time, sale_time)), 1, 10) lo,
-           substr(MAX(COALESCE(complete_time, sale_time)), 1, 10) hi
-    FROM sales WHERE completed = 1 AND voided = 0
-""")
-data_lo = dt.date.fromisoformat(bounds["lo"]) if bounds and bounds["lo"] else dt.date(2000, 1, 1)
-data_hi = dt.date.fromisoformat(bounds["hi"]) if bounds and bounds["hi"] else today
+def fy_of(d):
+    """The financial year `d` falls in, named for the June it ends in."""
+    return d.year + 1 if d.month >= FY_START_MONTH else d.year
 
 
 def fmt_day(d):
@@ -978,19 +1102,66 @@ def fmt_day(d):
     return f"{d.day} {d:%b %Y}"
 
 
+bounds = q1("""
+    SELECT substr(MIN(COALESCE(complete_time, sale_time)), 1, 10) lo,
+           substr(MAX(COALESCE(complete_time, sale_time)), 1, 10) hi
+    FROM sales WHERE completed = 1 AND voided = 0
+""")
+data_lo = dt.date.fromisoformat(bounds["lo"]) if bounds and bounds["lo"] else dt.date(2000, 1, 1)
+data_hi = dt.date.fromisoformat(bounds["hi"]) if bounds and bounds["hi"] else dt.date.today()
+
+# Only months and financial years the snapshot actually holds sales for are
+# offered. A picker that lists periods with no data invites a reader to select
+# an empty report and conclude the shop sold nothing.
+month_keys = q("""
+    SELECT DISTINCT substr(COALESCE(complete_time, sale_time), 1, 7) AS m
+    FROM sales WHERE completed = 1 AND voided = 0 ORDER BY m DESC
+""")["m"].tolist()
+fy_keys = sorted({fy_of(dt.date.fromisoformat(m + "-01")) for m in month_keys}, reverse=True)
+
+
+def month_window(key):
+    """('2026-09') -> (1 Sep 2026, 14 Sep 2026) — clamped to the last day of data."""
+    y, m = (int(x) for x in key.split("-"))
+    return dt.date(y, m, 1), min(month_end(y, m), data_hi)
+
+
+def fy_window(fy):
+    """FY2027 -> (1 Jul 2026, 14 Sep 2026) — to date, clamped to the data."""
+    start = dt.date(fy - 1, FY_START_MONTH, 1)
+    return start, min(dt.date(fy, FY_START_MONTH, 1) - dt.timedelta(days=1), data_hi)
+
+
+def month_label(key):
+    return f"{dt.date.fromisoformat(key + '-01'):%B %Y}"
+
+
+def fy_label(fy):
+    return f"FY{fy} · {fy - 1}/{str(fy)[2:]}"
+
+
+# ---------------------------------------------------------------- control bar
+#
+# The two review pages are pure output, so every control that drives them sits
+# in this bar above the document and is excluded from print.
+
 ctrl = st.container()
 with ctrl:
     st.markdown('<span class="mk-ctrlbar" style="display:none"></span>', unsafe_allow_html=True)
-    head = st.columns([6, 2, 2], gap="small", vertical_alignment="center")
-    period_slot = head[0].empty()   # filled once the dates below are resolved
+    head = st.columns([3, 3, 3, 2.4], gap="small", vertical_alignment="bottom")
 
+    with head[0]:
+        st.markdown('<div class="lbl">Month in review</div>', unsafe_allow_html=True)
+        month_key = st.selectbox("Month", month_keys, index=0, format_func=month_label,
+                                 label_visibility="collapsed", key="month_pick")
     with head[1]:
-        st.markdown('<span class="mk-toggle" style="display:none"></span>', unsafe_allow_html=True)
-        if st.button("Hide filter" if st.session_state.filter_open else "Change period",
-                     key="toggle_filter", use_container_width=True):
-            st.session_state.filter_open = not st.session_state.filter_open
-            st.rerun()
+        st.markdown('<div class="lbl">Financial year in review</div>', unsafe_allow_html=True)
+        fy_key = st.selectbox("Financial year", fy_keys, index=0, format_func=fy_label,
+                              label_visibility="collapsed", key="fy_pick")
     with head[2]:
+        print_appendix = st.checkbox("Print the appendix sheets too", value=False,
+                                     key="print_appendix")
+    with head[3]:
         # A raw `onclick="window.print()"` worked locally but did nothing on
         # Streamlit Community Cloud: inline event-handler attributes are the
         # first thing a strict Content-Security-Policy blocks, and Cloud applies
@@ -1001,61 +1172,16 @@ with ctrl:
         st.markdown('<span class="mk-print" style="display:none"></span>', unsafe_allow_html=True)
         print_clicked = st.button("Print to PDF", key="print_pdf", use_container_width=True)
 
-    if st.session_state.filter_open:
-        st.markdown('<div class="ctrlrule"></div>', unsafe_allow_html=True)
-        # st.segmented_control, not st.radio: the design's preset row IS a
-        # segmented control, and Streamlit's radio draws its selection dot with
-        # a pseudo-element that cannot be reliably hidden from an injected
-        # stylesheet. The native widget already has the right shape.
-        st.markdown('<span class="mk-preset" style="display:none"></span>', unsafe_allow_html=True)
-        preset = st.segmented_control("Reporting period", list(PRESETS.keys()),
-                                      default=st.session_state.preset,
-                                      label_visibility="collapsed", key="preset_pick")
-        preset = preset or st.session_state.preset
-        st.session_state.preset = preset
-    else:
-        preset = st.session_state.preset
+month_from, month_to = month_window(month_key)
+fy_from, fy_to = fy_window(fy_key)
 
-default_from, default_to = PRESETS[preset](today)
-# Presets run to "today", but the snapshot ends whenever it was last exported.
-# Left unclamped the band states a period that extends past the data it is
-# reporting on — the query returns nothing for those days, so the figures and
-# the stated period would disagree.
-if default_to and default_to > data_hi:
-    default_to = data_hi
-
-if preset == "Custom":
-    with ctrl:
-        dcols = st.columns([2, 2, 6], gap="small")
-        from_date = dcols[0].date_input("From", value=st.session_state.get("custom_from", data_lo),
-                                        min_value=data_lo, max_value=data_hi,
-                                        format="YYYY-MM-DD", key="custom_from")
-        to_date = dcols[1].date_input("To", value=st.session_state.get("custom_to", data_hi),
-                                      min_value=data_lo, max_value=data_hi,
-                                      format="YYYY-MM-DD", key="custom_to")
-else:
-    from_date, to_date = default_from, default_to
-
-if st.session_state.filter_open:
-    with ctrl:
-        st.markdown(
-            '<div class="ctrlnote">Scopes every figure on every sheet except stock on hand, '
-            'which is a point-in-time position and is labelled as such.</div>',
-            unsafe_allow_html=True,
-        )
-
-params = period_params(from_date, to_date)
-
-# The period line stamped into the page 1 band, and echoed in the control bar.
-band_from = from_date or data_lo
-band_to = to_date or data_hi
-range_text = f"{fmt_day(band_from)} – {fmt_day(band_to)}"       # en dash, per the design
-period_label = range_text if preset == "Custom" else f"{preset} · {range_text}"
-period_slot.markdown(
-    f'<div class="lbl">Reporting period</div>'
-    f'<div class="cur">{period_label}</div>',
-    unsafe_allow_html=True,
-)
+if print_appendix:
+    # The stylesheet hides .sheet.appendix from print; this puts it back. It has
+    # to be an override rather than a flag on <body>, which Streamlit gives no
+    # way to set, and it is a single line because a blank line inside a style
+    # block delivered through st.markdown truncates it (see css_for_markdown).
+    st.markdown("<style>@media print{.sheet.appendix{display:flex !important}}</style>",
+                unsafe_allow_html=True)
 
 if print_clicked:
     st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
@@ -1066,241 +1192,505 @@ if meta_row:
     stamp = dt.datetime.fromisoformat(meta_row["value"][:19])
     synced_text = f"Synced {fmt_day(stamp.date())}, {stamp:%H:%M}"
 
-# Period-scoped row counts for the band, not the whole-snapshot totals: the
-# band states the size of the period being reported on, so it has to move with
-# the filter.
-period_counts = q1(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT (SELECT COUNT(*) FROM valid) AS sales,
-           (SELECT COUNT(*) FROM lines) AS lines
-""", params)
-counts_text = f"{period_counts['sales']:,} sales · {period_counts['lines']:,} lines"
 
-
-# ---------------------------------------------------------------- KPIs (+ SPLY)
-
-kpi_sql = f"""
-WITH {VALID_SALE_CTE}
-SELECT
-  (SELECT COALESCE(SUM(revenue), 0) FROM lines) AS revenue,
-  (SELECT COALESCE(SUM(cogs), 0) FROM lines) AS cogs,
-  (SELECT COALESCE(SUM(quantity), 0) FROM lines) AS units,
-  (SELECT COUNT(*) FROM valid) AS transactions,
-  (SELECT COALESCE(SUM(sale_revenue), 0) FROM valid) AS sale_level_revenue,
-  (SELECT COALESCE(SUM(revenue), 0) FROM lines WHERE no_cost_on_record) AS zero_cost_revenue,
-  (SELECT COALESCE(SUM(revenue), 0) FROM lines WHERE revenue < 0) AS returns_revenue,
-  (SELECT COUNT(*) FROM lines WHERE revenue < 0) AS returns_lines
-"""
-
-kpis_raw = q1(kpi_sql, params)
-adj_rows, adj_rev, adj_cost, adj_gp = get_adjustments(from_date, to_date)
-kpis = dict(kpis_raw)
-kpis["lightspeed_revenue"] = kpis["revenue"]
-kpis["revenue"] += adj_rev
-kpis["cogs"] += adj_cost
-gp = kpis["revenue"] - kpis["cogs"]
-margin = margin_of(gp, kpis["revenue"])
-avg_sale = kpis["revenue"] / kpis["transactions"] if kpis["transactions"] else 0
-
-sply = None
-if from_date or to_date:
-    sp_from, sp_to = shift_year(from_date, -1), shift_year(to_date, -1)
-    sp_raw = q1(kpi_sql, period_params(sp_from, sp_to))
-    _, sp_adj_rev, sp_adj_cost, _ = get_adjustments(sp_from, sp_to)
-    sp_rev = sp_raw["revenue"] + sp_adj_rev
-    sp_cogs = sp_raw["cogs"] + sp_adj_cost
-    sp_gp = sp_rev - sp_cogs
-    sp_margin = margin_of(sp_gp, sp_rev)
-    sp_avg = sp_rev / sp_raw["transactions"] if sp_raw["transactions"] else None
-    sply = {"revenue": sp_rev, "gp": sp_gp, "margin": sp_margin, "avg": sp_avg}
-
-# ---------------------------------------------------------------- category & budget
-
-by_category = q(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-           SUM(l.revenue) AS revenue,
-           SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
-           SUM(l.quantity) AS units
-    FROM lines l
-    LEFT JOIN items i ON i.item_id = l.item_id
-    LEFT JOIN categories c ON c.category_id = i.category_id
-    GROUP BY category
-    HAVING SUM(l.revenue) <> 0
-    ORDER BY revenue DESC
-""", params)
-if not adj_rows.empty:
-    item_cat_map = q("""
-        SELECT UPPER(TRIM(i.description)) d, COALESCE(c.top_level_name,'Uncategorised') cat
-        FROM items i LEFT JOIN categories c ON c.category_id = i.category_id
-    """).drop_duplicates("d").set_index("d")["cat"].to_dict()
-    add = {}
-    for _, r in adj_rows.iterrows():
-        cat = item_cat_map.get(str(r["description"]).upper().strip(), "Unmatched (adjustments)")
-        a = add.setdefault(cat, {"revenue": 0.0, "gross_profit": 0.0, "units": 0.0})
-        a["revenue"] += r["revenue"]; a["gross_profit"] += r["revenue"] - r["cost"]; a["units"] += r["qty"]
-    for cat, a in add.items():
-        if cat in by_category["category"].values:
-            idx = by_category.index[by_category["category"] == cat][0]
-            by_category.loc[idx, "revenue"] += a["revenue"]
-            by_category.loc[idx, "gross_profit"] += a["gross_profit"]
-            by_category.loc[idx, "units"] += a["units"]
-        else:
-            by_category = pd.concat([by_category, pd.DataFrame([{**a, "category": cat}])], ignore_index=True)
-    by_category = by_category[by_category["revenue"] != 0].sort_values("revenue", ascending=False)
-
-cat_rows = [{"label": r["category"], "revenue": r["revenue"], "gross_profit": r["gross_profit"]}
-            for _, r in by_category.iterrows()]
-# Nine rows plus a total is what the design's page-1 box fits. prep_bars rolls
-# everything past that into a single OTHER row, but still totals over the full
-# set, so the total reconciles with the KPI strip above it.
-cat_shown, cat_tot_rev, cat_tot_gp = prep_bars(cat_rows, limit=9)
-cat_body = bars_html(cat_shown, cat_tot_rev, cat_tot_gp)
+# ---------------------------------------------------------------- budget
+#
+# Budget is monthly, the review windows are not, so a month that the window
+# only partly covers contributes only that fraction of its budget. Prorating by
+# day is the assumption: it treats trade as flat within a month, which it is
+# not — but the alternative is comparing a half-month of sales with a whole
+# month of budget, which is wrong by a much larger margin.
 
 budget_all = q("SELECT * FROM budget")
 if budget_all.empty:
-    budget_body = '<div class="empty">No budget data in the snapshot.</div>'
-    budget_meta = "No budget loaded"
+    budget_lo = budget_hi = None
 else:
-    categories = sorted(budget_all["category"].unique())
-    months = sorted(budget_all["month"].unique())
-    budget_first = f"{months[0]}-01"
-    by, bm = (int(x) for x in months[-1].split("-"))
-    budget_last = (dt.date(by, bm % 12 + 1, 1) - dt.timedelta(days=1)) if bm < 12 else dt.date(by, 12, 31)
+    b_months = sorted(budget_all["month"].unique())
+    budget_lo = dt.date.fromisoformat(b_months[0] + "-01")
+    by, bm = (int(x) for x in b_months[-1].split("-"))
+    budget_hi = month_end(by, bm)
 
-    data_range = q1("""
-        SELECT substr(MIN(COALESCE(complete_time, sale_time)), 1, 10) lo,
-               substr(MAX(COALESCE(complete_time, sale_time)), 1, 10) hi
-        FROM sales WHERE completed = 1 AND voided = 0
-    """)
 
-    bud_from = max(filter(None, [from_date.isoformat() if from_date else None, budget_first, data_range["lo"]]))
-    bud_to = min(filter(None, [to_date.isoformat() if to_date else None, budget_last.isoformat(), data_range["hi"]]))
-
-    def prorate(row_from, row_to, req_from, req_to):
-        lo = max(row_from, req_from)
-        hi = min(row_to, req_to)
-        if hi < lo:
-            return 0.0
-        days_total = (row_to - row_from).days + 1
-        days_overlap = (hi - lo).days + 1
-        return min(1.0, days_overlap / days_total)
-
-    prorated = {}
+def budget_for(from_date, to_date):
+    """Prorated budget per category over [from_date, to_date], by day."""
+    out = {c: 0.0 for c in budgeted_categories}
+    if budget_all.empty:
+        return out
     for _, r in budget_all.iterrows():
         y, m = (int(x) for x in r["month"].split("-"))
-        m_start = dt.date(y, m, 1)
-        m_end = (dt.date(y, m + 1, 1) - dt.timedelta(days=1)) if m < 12 else dt.date(y, 12, 31)
-        share = prorate(m_start, m_end, dt.date.fromisoformat(bud_from), dt.date.fromisoformat(bud_to))
-        prorated[r["category"]] = prorated.get(r["category"], 0) + r["amount"] * share
+        m_start, m_end = dt.date(y, m, 1), month_end(y, m)
+        lo, hi = max(m_start, from_date), min(m_end, to_date)
+        if hi < lo:
+            continue
+        share = ((hi - lo).days + 1) / ((m_end - m_start).days + 1)
+        out[r["category"]] = out.get(r["category"], 0.0) + r["amount"] * min(1.0, share)
+    return out
 
-    actual_by_cat = q(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-               SUM(l.revenue) AS revenue
-        FROM lines l
-        LEFT JOIN items i ON i.item_id = l.item_id
-        LEFT JOIN categories c ON c.category_id = i.category_id
-        GROUP BY category
-    """, {"from_date": bud_from, "to_date": bud_to})
-    actual_map = dict(zip(actual_by_cat["category"], actual_by_cat["revenue"]))
 
-    adj_win_rows, _, _, _ = get_adjustments(dt.date.fromisoformat(bud_from), dt.date.fromisoformat(bud_to))
-    if not adj_win_rows.empty:
-        item_cat = q("""
-            SELECT UPPER(TRIM(i.description)) d, COALESCE(c.top_level_name,'Uncategorised') cat
-            FROM items i LEFT JOIN categories c ON c.category_id = i.category_id
-        """).drop_duplicates("d").set_index("d")["cat"].to_dict()
-        for _, r in adj_win_rows.iterrows():
-            cat = item_cat.get(str(r["description"]).upper().strip())
-            if cat:
-                actual_map[cat] = actual_map.get(cat, 0) + r["revenue"]
+# ---------------------------------------------------------------- tree building
 
-    comparison = []
-    for cat in categories:
-        b = prorated.get(cat, 0.0)
-        a = actual_map.get(cat, 0.0)
-        comparison.append({"category": cat, "budget": b, "actual": a, "variance": a - b,
-                           "variance_pct": ((a - b) / b * 100) if b else None})
-    comp_sorted = sorted(comparison, key=lambda r: r["budget"], reverse=True)
-    unbudgeted = sum(v for k, v in actual_map.items() if k not in categories)
+def item_label(r):
+    """One sold item, named as the reader would name it: the product, then the
+    size it was sold in where the item has one."""
+    _, name, size = product_levels(r)
+    return f"{name} · {size}" if size else name
 
-    tb = sum(r["budget"] for r in comp_sorted)
-    ta = sum(r["actual"] for r in comp_sorted)
-    tv = ta - tb
-    tv_pct = (tv / tb * 100) if tb else None
 
-    budget_meta = (f"{fmt_day(dt.date.fromisoformat(bud_from))} – {fmt_day(dt.date.fromisoformat(bud_to))}"
-                   f" · {len(categories)} budgeted categories")
-    budget_body = budget_summary(tb, ta, tv, tv_pct) + budget_table_html(comp_sorted)
-    budget_note = f"Only the {len(categories)} budgeted categories are compared; partial months prorated by day."
-    if unbudgeted:
-        budget_note += f" A further {zar(unbudgeted)} sits in unbudgeted categories — context, not variance."
+def build_tree(records, levels, keys, caps=None, depth=0):
+    """Group `records` by `levels[0]`, recursing for each deeper level.
 
-# ---------------------------------------------------------------- operating health
+    `keys` names the (units, revenue, cost) fields to total — the same builder
+    serves the whole-shop tables and the Shopify ones, which differ only in
+    which three columns they add up. `caps` limits the row count at a given
+    depth and rolls the remainder into one Other row, so a subcategory with
+    four hundred lines cannot quietly become four hundred rows of HTML.
+    """
+    if not levels:
+        return []
+    unit_k, rev_k, cost_k = keys
+    buckets = {}
+    for r in records:
+        buckets.setdefault(levels[0](r), []).append(r)
+
+    nodes = []
+    for label, rs in buckets.items():
+        rev = sum(r[rev_k] or 0 for r in rs)
+        nodes.append({
+            "label": label,
+            "units": sum(r[unit_k] or 0 for r in rs),
+            "revenue": rev,
+            "gp": rev - sum(r[cost_k] or 0 for r in rs),
+            "children": build_tree(rs, levels[1:], keys, caps, depth + 1),
+        })
+    nodes.sort(key=lambda n: n["revenue"], reverse=True)
+
+    cap = (caps or {}).get(depth)
+    if cap and len(nodes) > cap:
+        head_nodes, rest = nodes[:cap], nodes[cap:]
+        nodes = head_nodes + [{
+            "label": f"Other ({len(rest)})",
+            "units": sum(n["units"] for n in rest),
+            "revenue": sum(n["revenue"] for n in rest),
+            "gp": sum(n["gp"] for n in rest),
+            "children": [],
+        }]
+    return nodes
+
+
+def tree_totals(nodes):
+    return (sum(n["units"] for n in nodes),
+            sum(n["revenue"] for n in nodes),
+            sum(n["gp"] for n in nodes))
+
+
+# ---------------------------------------------------------------- one review
 #
-# The three cards on page 1. Each compresses a detail table that the A4 design
-# cut from the report but which still appears in full on the detail sheets.
+# Both pages are the same report over a different window, so they are built by
+# the same function and differ only in the period handed to it.
 
-attach_summary = q1(f"""
-    WITH {VALID_SALE_CTE},
-    bike_sales AS (
-        SELECT DISTINCT l.sale_id FROM lines l
-        JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
-    ),
-    attached AS (
-        SELECT l.sale_id, l.revenue, l.quantity
+CAT_COLUMNS = [("Category", "1fr"), ("Revenue", "84px"), ("Gross profit", "84px"),
+               ("Gross margin", "58px"), ("Budget vs actual", "88px"),
+               ("Budget vs actual %", "74px")]
+SHOP_COLUMNS = [("Category", "1fr"), ("Quantity", "62px"), ("Revenue", "92px"),
+                ("Gross profit", "92px"), ("Gross margin", "68px")]
+TOP_COLUMNS = [("Range · model · size", "1fr"), ("Units", "58px"), ("Revenue", "92px"),
+               ("Gross profit", "92px"), ("Gross margin", "68px")]
+
+
+def signed_money(v):
+    return f"{'+' if v >= 0 else '−'}{money(abs(v))}"
+
+
+def verdict_colour(v):
+    """Green at or above budget, red below. The only place in the report where
+    hue rather than weight carries the judgement."""
+    return "var(--good)" if v >= 0 else "var(--clay)"
+
+
+def period_records(from_date, to_date):
+    """Every item sold in the window, inside the report's category scope.
+
+    Returns the rows plus the two disclosure figures the page footer needs:
+    revenue that fell outside the scope, and revenue carrying no unit cost.
+    """
+    params = {**period_params(from_date, to_date), **CAT_PARAMS}
+    records = q(ITEM_SQL, params).to_dict("records")
+    scope = q1(SCOPE_SQL, params)
+
+    adj = get_adjustments(from_date, to_date)
+    adj_in, adj_out = 0.0, 0.0
+    for _, a in adj.iterrows():
+        key = str(a["description"]).upper().strip()
+        if key not in ADJ_LOOKUP.index:
+            adj_out += a["revenue"]
+            continue
+        m = ADJ_LOOKUP.loc[key]
+        if m["category"] not in report_categories:
+            adj_out += a["revenue"]
+            continue
+        adj_in += a["revenue"]
+        records.append({
+            "category": m["category"], "subcategory": m["subcategory"], "leaf": m["leaf"],
+            "description": m["description"], "bike_model": m["bike_model"],
+            "bike_trim": m["bike_trim"], "bike_size": m["bike_size"],
+            "units": a["qty"], "revenue": a["revenue"], "cogs": a["cost"],
+            "sh_units": 0.0, "sh_revenue": 0.0, "sh_cogs": 0.0,
+        })
+
+    return records, {
+        "out_of_scope": scope["all_revenue"] - scope["in_scope"],
+        "zero_cost": scope["zero_cost"],
+        "adjustments_in": adj_in,
+        "adjustments_out": adj_out,
+    }
+
+
+def build_review(from_date, to_date):
+    """Everything one review page shows, over one window."""
+    records, notes = period_records(from_date, to_date)
+    sply_from, sply_to = shift_year(from_date, -1), shift_year(to_date, -1)
+    sply_records, _ = period_records(sply_from, sply_to)
+
+    def totals(rows, rev_k="revenue", cost_k="cogs", unit_k="units"):
+        rev = sum(r[rev_k] or 0 for r in rows)
+        return (sum(r[unit_k] or 0 for r in rows), rev, rev - sum(r[cost_k] or 0 for r in rows))
+
+    _, revenue, gross_profit = totals(records)
+    _, sp_revenue, sp_gross_profit = totals(sply_records)
+    gm, sp_gm = margin_of(gross_profit, revenue), margin_of(sp_gross_profit, sp_revenue)
+
+    # Budget covers the budgeted categories only, so the actual it is measured
+    # against has to as well: including Wheelsets in the numerator of a
+    # comparison whose denominator has no Wheelsets line would show a surplus
+    # the shop never budgeted to earn.
+    budget = budget_for(from_date, to_date)
+    budget_total = sum(budget.values())
+    budgeted_actual = sum(r["revenue"] or 0 for r in records
+                          if r["category"] in budgeted_categories)
+    variance = budgeted_actual - budget_total
+    variance_pct = (variance / budget_total * 100) if budget_total else None
+
+    def delta_sub(curr, prior, is_points=False):
+        """The SPLY line under a performance card: last year's figure, then the
+        movement. A period with no prior-year trade gets the honest blank."""
+        value = pct(prior) if is_points else money(prior)
+        if prior is None or pd.isna(prior) or (not is_points and not prior):
+            return [{"text": f"SPLY {value}"}]
+        d = (curr - prior) if is_points else (curr - prior) / abs(prior) * 100
+        sign = "+" if d >= 0 else "−"
+        unit = "pp" if is_points else "%"
+        return [{"text": f"SPLY {value}"},
+                {"text": f"{sign}{abs(d):.1f}{unit}", "colour": verdict_colour(d)}]
+
+    cards = (
+        '<div class="mcards">'
+        + metric_card("Revenue", money(revenue), delta_sub(revenue, sp_revenue))
+        + metric_card("Gross profit", money(gross_profit), delta_sub(gross_profit, sp_gross_profit))
+        + metric_card("Gross profit margin", pct(gm),
+                      delta_sub(gm, sp_gm, is_points=True))
+        + metric_card("Actual vs budget", money(budgeted_actual),
+                      [{"text": f"Budget {money(budget_total)}"},
+                       {"text": "—" if variance_pct is None
+                        else f"{'+' if variance >= 0 else '−'}{abs(variance_pct):.1f}%",
+                        "colour": verdict_colour(variance)}],
+                      figure_colour=verdict_colour(variance))
+        + "</div>"
+    )
+
+    # ---- category overview: category -> subcategory -> item and its size
+    cat_nodes = build_tree(records, [lambda r: r["category"],
+                                     lambda r: r["subcategory"],
+                                     item_label],
+                           ("units", "revenue", "cogs"), caps={2: 20})
+    for n in cat_nodes:
+        n["budget"] = budget.get(n["label"])
+
+    def cat_cells(n, depth):
+        cells = [cell(money(n["revenue"])), cell(money(n["gp"])),
+                 cell(pct(margin_of(n["gp"], n["revenue"])), muted=True)]
+        b = n.get("budget") if depth == 1 else None
+        if b is None:
+            # Below the top level, and for Wheelsets at it, there is no budget
+            # to vary from. An apportioned share of one would be invented.
+            cells += [cell("—", muted=True), cell("—", muted=True)]
+        else:
+            var = n["revenue"] - b
+            vpct = (var / b * 100) if b else None
+            colour = verdict_colour(var)
+            cells.append(cell(signed_money(var), colour=colour))
+            cells.append(cell("—" if vpct is None
+                              else f"{'+' if var >= 0 else '−'}{abs(vpct):.1f}%", colour=colour))
+        return "".join(cells)
+
+    _, cat_rev, cat_gp = tree_totals(cat_nodes)
+    cat_total = {"label": "Total", "cells": "".join([
+        cell(money(cat_rev)), cell(money(cat_gp)), cell(pct(margin_of(cat_gp, cat_rev))),
+        cell(signed_money(variance), colour=verdict_colour(variance)),
+        cell("—" if variance_pct is None
+             else f"{'+' if variance >= 0 else '−'}{abs(variance_pct):.1f}%",
+             colour=verdict_colour(variance)),
+    ])}
+    category_body = drill_table(CAT_COLUMNS, cat_nodes, cat_cells, total=cat_total,
+                                empty_text="No sales in this period.")
+
+    # ---- Shopify
+    def value_cells(n, depth):
+        return "".join([cell(f"{n['units']:,.0f}"), cell(money(n["revenue"])),
+                        cell(money(n["gp"])),
+                        cell(pct(margin_of(n["gp"], n["revenue"])), muted=True)])
+
+    shop_records = [r for r in records if (r["sh_revenue"] or 0) or (r["sh_units"] or 0)]
+    shop_nodes = build_tree(shop_records, [lambda r: r["category"],
+                                           lambda r: r["subcategory"],
+                                           item_label],
+                            ("sh_units", "sh_revenue", "sh_cogs"), caps={0: 6, 2: 20})
+    shop_units, shop_rev, shop_gp = tree_totals(shop_nodes)
+    shop_gm = margin_of(shop_gp, shop_rev)
+    sp_shop_rev = sum(r["sh_revenue"] or 0 for r in sply_records)
+    sp_shop_gp = sp_shop_rev - sum(r["sh_cogs"] or 0 for r in sply_records)
+    sp_shop_gm = margin_of(sp_shop_gp, sp_shop_rev)
+
+    shop_total = {"label": "Total", "cells": "".join([
+        cell(f"{shop_units:,.0f}"), cell(money(shop_rev)), cell(money(shop_gp)),
+        cell(pct(shop_gm)),
+    ])}
+    if not HAS_SOURCE:
+        shopify_body = ('<div class="empty">Channel data is not in this snapshot — '
+                        'reference_number_source is missing from the sales table.</div>')
+    else:
+        shopify_body = (
+            '<div class="mcards two">'
+            + metric_card("Shopify revenue", money(shop_rev),
+                          [{"text": f"SPLY {money(sp_shop_rev)}"}])
+            + metric_card("Shopify gross margin", pct(shop_gm),
+                          [{"text": f"GM SPLY {pct(sp_shop_gm)}"}])
+            + "</div>"
+            + drill_table(SHOP_COLUMNS, shop_nodes, value_cells, total=shop_total,
+                          empty_text="No Shopify-sourced sales in this period.")
+        )
+
+    # ---- top ten sellers, grouped range -> model -> size
+    def range_of(r):
+        return product_levels(r)[0]
+
+    def model_of(r):
+        return product_levels(r)[1]
+
+    def size_of(r):
+        return product_levels(r)[2] or "(no size)"
+
+    top_nodes = build_tree(records, [range_of, model_of, size_of],
+                           ("units", "revenue", "cogs"))[:10]
+    top_units, top_rev, top_gp = tree_totals(top_nodes)
+    top_total = {"label": "Top ten total", "cells": "".join([
+        cell(f"{top_units:,.0f}"), cell(money(top_rev)), cell(money(top_gp)),
+        cell(pct(margin_of(top_gp, top_rev))),
+    ])}
+    top_body = drill_table(TOP_COLUMNS, top_nodes, value_cells, total=top_total,
+                           empty_text="No sales in this period.")
+
+    return {
+        "from": from_date, "to": to_date,
+        "sply_from": sply_from, "sply_to": sply_to,
+        "revenue": revenue, "gross_profit": gross_profit, "margin": gm,
+        "budget_total": budget_total, "budgeted_actual": budgeted_actual,
+        "variance": variance, "variance_pct": variance_pct,
+        "cards": cards, "category_body": category_body,
+        "shopify_body": shopify_body, "top_body": top_body,
+        "notes": notes, "records": records,
+    }
+
+
+def review_footer(rv):
+    """The two-column methodology strip at the foot of a review page."""
+    n = rv["notes"]
+    left = ("Revenue is ex-VAT and net of discounts, counting only completed, non-voided "
+            "sales — the same basis as the Lightspeed sales report. Every figure on this "
+            f"page covers the {len(budgeted_categories)} budgeted categories plus Wheelsets.")
+    if n["out_of_scope"]:
+        left += (f" A further ZAR {money(n['out_of_scope'])} traded in categories outside that "
+                 "scope (Paarl Trails, Retül, warranty, display) and is not counted anywhere "
+                 "on this page.")
+    if n["adjustments_in"]:
+        left += (f" Includes ZAR {money(n['adjustments_in'])} of off-Lightspeed sales from "
+                 "Adjustments.xlsx.")
+
+    right = ("Budget is prorated by day, so a part-covered month contributes only that part "
+             "of its budget. Wheelsets carries no budget line, so the variance column and "
+             f"its total compare the {len(budgeted_categories)} budgeted categories only.")
+    if n["zero_cost"]:
+        zc_pct = n["zero_cost"] / rv["revenue"] * 100 if rv["revenue"] else 0
+        right += (f" ZAR {money(n['zero_cost'])} of revenue ({pct(zc_pct)}) carries no unit cost — "
+                  "service and labour lines legitimately have no COGS, which is why Service "
+                  "Centre shows a margin near 100%.")
+    return f'<footer class="notes"><div>{left}</div><div>{right}</div></footer>'
+
+
+def review_sections(rv):
+    """The three sections shared by both review pages."""
+    sply_span = f"vs {fmt_day(rv['sply_from'])} – {fmt_day(rv['sply_to'])}"
+    return f'''<section>
+      {section_header("Category overview", "Budgeted categories and Wheelsets · open a row for its subcategories and sizes", "tight", level=3)}
+      {rv["category_body"]}
+    </section>
+    <section>
+      {section_header("Shopify sales", f"Online channel · {sply_span}", "tight", level=3)}
+      {rv["shopify_body"]}
+    </section>
+    <section>
+      {section_header("Top ten sellers", "By revenue · range, opening into model and size", "tight", level=3)}
+      {rv["top_body"]}
+    </section>
+    {review_footer(rv)}'''
+
+
+month_review = build_review(month_from, month_to)
+fy_review = build_review(fy_from, fy_to)
+
+month_span = f"{fmt_day(month_from)} – {fmt_day(month_to)}"
+fy_span = f"{fmt_day(fy_from)} – {fmt_day(fy_to)}"
+period_counts = q1(f"""
+    WITH {VALID_SALE_CTE}
+    SELECT (SELECT COUNT(*) FROM valid) AS sales, (SELECT COUNT(*) FROM lines) AS lines
+""", period_params(month_from, month_to))
+
+# ================================================================== SHEET 1 — the month
+
+st.markdown(
+    f'''<div class="sheet s1">
+  <div class="band">
+    <div>
+      <div class="eyebrow">Specialized Paarl · Lightspeed Retail</div>
+      <h1>{month_label(month_key)}</h1>
+      <div class="period">{month_span} · ZAR, ex-VAT and net of discounts</div>
+    </div>
+    <div class="bandright">
+      <div class="txt">
+        <div class="eyebrow">Page 1 of 2 · Month in review</div>
+        <div class="synced">{esc(synced_text)}</div>
+        <div class="counts">{period_counts["sales"]:,} sales · {period_counts["lines"]:,} lines</div>
+      </div>
+      {logo_img()}
+    </div>
+  </div>
+  <div class="inner">
+    {month_review["cards"]}
+    {review_sections(month_review)}
+  </div>
+</div>''',
+    unsafe_allow_html=True,
+)
+
+# ================================================================== SHEET 2 — the financial year
+
+st.markdown(
+    f'''<div class="sheet s1 s2">
+  <div class="inner">
+    {page_header(f"FY{fy_key} to date", f"Specialized Paarl · Page 2 of 2 · {fy_span}")}
+    {fy_review["cards"]}
+    {review_sections(fy_review)}
+  </div>
+</div>''',
+    unsafe_allow_html=True,
+)
+
+
+# ================================================================== APPENDIX
+#
+# Attach rate and stock position sit beside the report rather than in it: both
+# are standing operational analyses rather than a period result, and the stock
+# position is not period-filtered at all. They are on their own sheets, and off
+# the printed document unless the control bar asks for them, so the report
+# itself is always exactly the two pages above.
+
+def attach_stats(from_date, to_date):
+    """Accessories sold in the same transaction as a complete bike.
+
+    Attached lines are scoped the same way the rest of the report is, so the
+    attached revenue here and the category overview on page 1 are the same
+    money counted two ways rather than two different universes.
+    """
+    params = {**period_params(from_date, to_date), **CAT_PARAMS}
+    summary = q1(f"""
+        WITH {VALID_SALE_CTE},
+        bike_sales AS (
+            SELECT DISTINCT l.sale_id FROM lines l
+            JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
+        ),
+        attached AS (
+            SELECT l.sale_id, l.revenue, l.quantity
+            FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
+            LEFT JOIN items i ON i.item_id = l.item_id
+            LEFT JOIN categories c ON c.category_id = i.category_id
+            WHERE c.top_level_name IN {CAT_IN}
+              AND c.top_level_name NOT IN ('BIKE', 'TURBO')
+        )
+        SELECT (SELECT COUNT(*) FROM bike_sales) AS bike_transactions,
+               (SELECT COUNT(DISTINCT sale_id) FROM attached WHERE revenue > 0) AS with_attachment,
+               (SELECT COALESCE(SUM(revenue), 0) FROM attached) AS attached_revenue,
+               (SELECT COALESCE(SUM(quantity), 0) FROM attached) AS attached_units
+    """, params)
+    by_cat = q(f"""
+        WITH {VALID_SALE_CTE},
+        bike_sales AS (
+            SELECT DISTINCT l.sale_id FROM lines l
+            JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
+        )
+        SELECT c.top_level_name AS category,
+               SUM(l.quantity) AS units,
+               SUM(l.revenue) AS revenue,
+               SUM(l.revenue) - SUM(l.cogs) AS gross_profit
         FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
         LEFT JOIN items i ON i.item_id = l.item_id
         LEFT JOIN categories c ON c.category_id = i.category_id
-        WHERE c.top_level_name IS NULL OR c.top_level_name NOT IN ('BIKE','TURBO')
-    )
-    SELECT (SELECT COUNT(*) FROM bike_sales) AS bike_transactions,
-           (SELECT COUNT(DISTINCT sale_id) FROM attached WHERE revenue > 0) AS transactions_with_attachment,
-           (SELECT COALESCE(SUM(revenue), 0) FROM attached) AS attached_revenue,
-           (SELECT COALESCE(SUM(quantity), 0) FROM attached) AS attached_units
-""", params)
+        WHERE c.top_level_name IN {CAT_IN}
+          AND c.top_level_name NOT IN ('BIKE', 'TURBO')
+        GROUP BY category
+        HAVING SUM(l.revenue) <> 0
+        ORDER BY revenue DESC
+    """, params)
+    txns = summary["bike_transactions"] or 0
+    return summary, by_cat, txns, ((summary["with_attachment"] / txns * 100) if txns else None)
 
-attach_by_cat = q(f"""
-    WITH {VALID_SALE_CTE},
-    bike_sales AS (
-        SELECT DISTINCT l.sale_id FROM lines l
-        JOIN item_models im ON im.item_id = l.item_id WHERE im.kind = 'complete'
-    )
-    SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-           SUM(l.revenue) AS revenue,
-           SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
-           SUM(l.quantity) AS units
-    FROM bike_sales bs JOIN lines l ON l.sale_id = bs.sale_id
-    LEFT JOIN items i ON i.item_id = l.item_id
-    LEFT JOIN categories c ON c.category_id = i.category_id
-    WHERE c.top_level_name IS NULL OR c.top_level_name NOT IN ('BIKE','TURBO')
-    GROUP BY category
-    HAVING SUM(l.revenue) <> 0
-    ORDER BY revenue DESC
-""", params)
 
-bike_txns = attach_summary["bike_transactions"] or 0
-with_attach = attach_summary["transactions_with_attachment"] or 0
-attach_rate = (with_attach / bike_txns * 100) if bike_txns else None
+def attach_row(label, summary, txns, rate):
+    return stats_html([
+        {"label": "Bike sales", "value": f"{txns:,}"},
+        {"label": "With an accessory", "value": pct(rate),
+         "foot": f'{summary["with_attachment"]:,} of {txns:,}'},
+        {"label": "Attached revenue", "value": money(summary["attached_revenue"]),
+         "foot": f'{summary["attached_units"]:,.0f} units'},
+        {"label": "Per bike sold",
+         "value": money(summary["attached_revenue"] / txns if txns else 0), "foot": label},
+    ])
 
-# Discount leakage. The A4 design shows this as an Operating health card but the
-# app had no query for it: revenue is already net of discount everywhere else,
-# so the gross list figure has to come back off calc_subtotal. Leakage is
-# measured against gross list revenue (what the goods would have rung up at),
-# not against net revenue — dividing by net would overstate the rate.
-discount = q1(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT
-      COALESCE(SUM(sl.calc_subtotal), 0) AS gross_list,
-      COALESCE(SUM(sl.calc_line_discount + sl.calc_transaction_discount), 0) AS discount_given,
-      COUNT(*) AS line_count,
-      SUM(CASE WHEN (sl.calc_line_discount + sl.calc_transaction_discount) > 0 THEN 1 ELSE 0 END) AS discounted_lines
-    FROM sale_lines sl
-    JOIN valid v ON v.sale_id = sl.sale_id
-""", params)
-leak_pct = (discount["discount_given"] / discount["gross_list"] * 100) if discount["gross_list"] else None
-disc_line_pct = (discount["discounted_lines"] / discount["line_count"] * 100) if discount["line_count"] else None
+
+m_sum, m_cat, m_txns, m_rate = attach_stats(month_from, month_to)
+f_sum, f_cat, f_txns, f_rate = attach_stats(fy_from, fy_to)
+attach_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]),
+                money(r["gross_profit"]), pct(margin_of(r["gross_profit"], r["revenue"]))]
+               for _, r in f_cat.iterrows()]
+
+st.markdown(
+    f'''<div class="sheet sn appendix">
+  {page_header("Accessory attach rate", "Specialized Paarl · Appendix A")}
+  <section>
+    {section_header(f"{month_label(month_key)}", month_span, "sub", level=3)}
+    {attach_row("This month", m_sum, m_txns, m_rate)}
+  </section>
+  <section>
+    {section_header(f"FY{fy_key} to date", fy_span, "sub", level=3)}
+    {attach_row("Year to date", f_sum, f_txns, f_rate)}
+    {html_table(["Attached category", "Units", "Revenue", "Gross profit", "Margin"],
+                attach_rows, name_col=0, muted_cols=(4,),
+                empty_text="No attached sales in this period.")}
+    <div class="note">An attachment is any line on the same transaction as a complete bike
+    that is not itself a bike. Scoped, like the report, to the budgeted categories and
+    Wheelsets. A bike sold with nothing else counts against the rate, not out of it.</div>
+  </section>
+</div>''',
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------- stock (never period-filtered)
 
@@ -1309,17 +1699,14 @@ anchor_row = q1("""
     FROM sales WHERE completed = 1 AND voided = 0
 """)
 anchor = anchor_row["d"] if anchor_row else None
-stock_ready = False
 
 if anchor:
-    anchor_date = dt.date.fromisoformat(anchor)
-    trail_from = (anchor_date - dt.timedelta(days=364)).isoformat()
-    trail_params = {"trail_from": trail_from, "anchor": anchor}
+    trail_from = (dt.date.fromisoformat(anchor) - dt.timedelta(days=364)).isoformat()
+    trail_params = {"trail_from": trail_from, "anchor": anchor, **CAT_PARAMS}
 
     TRAILING = """
     trailing AS (
         SELECT sl.item_id,
-               SUM(sl.quantity) AS net_units,
                SUM(CASE WHEN sl.quantity > 0 THEN sl.quantity ELSE 0 END) AS gross_units,
                SUM(sl.quantity * CASE WHEN sl.fifo_cost > 0 THEN sl.fifo_cost ELSE sl.avg_cost END) AS cogs
         FROM sale_lines sl
@@ -1329,18 +1716,24 @@ if anchor:
         GROUP BY sl.item_id
     )
     """
+    IN_SCOPE = f"""
+        EXISTS (SELECT 1 FROM items i2 JOIN categories c2 ON c2.category_id = i2.category_id
+                WHERE i2.item_id = s.item_id AND c2.top_level_name IN {CAT_IN})
+    """
 
-    stock_summary = q1("""
-        SELECT (SELECT COALESCE(SUM(value_avg_cost),0) FROM item_shops WHERE qoh > 0) AS stock_value,
-               (SELECT COALESCE(SUM(qoh),0) FROM item_shops WHERE qoh > 0) AS stock_units,
-               (SELECT COUNT(*) FROM item_shops WHERE qoh > 0) AS stocked_skus
-    """)
-    trailing_cogs = q1("""
-        SELECT COALESCE(SUM(sl.quantity * CASE WHEN sl.fifo_cost>0 THEN sl.fifo_cost ELSE sl.avg_cost END),0) AS cogs
-        FROM sale_lines sl JOIN sales s ON s.sale_id = sl.sale_id
-        WHERE s.completed=1 AND s.voided=0
-          AND substr(COALESCE(s.complete_time, s.sale_time),1,10) BETWEEN :lo AND :hi
-    """, {"lo": trail_from, "hi": anchor})["cogs"]
+    stock_summary = q1(f"""
+        SELECT COALESCE(SUM(s.value_avg_cost), 0) AS stock_value,
+               COALESCE(SUM(s.qoh), 0) AS stock_units,
+               COUNT(*) AS stocked_skus
+        FROM item_shops s WHERE s.qoh > 0 AND {IN_SCOPE}
+    """, trail_params)
+    trailing_cogs = q1(f"""
+        WITH {TRAILING}
+        SELECT COALESCE(SUM(t.cogs), 0) AS cogs FROM trailing t
+        JOIN items i ON i.item_id = t.item_id
+        JOIN categories c ON c.category_id = i.category_id
+        WHERE c.top_level_name IN {CAT_IN}
+    """, trail_params)["cogs"]
     turn = trailing_cogs / stock_summary["stock_value"] if stock_summary["stock_value"] else None
 
     dead_total = q1(f"""
@@ -1352,32 +1745,30 @@ if anchor:
         WHERE s.qoh > 0 AND s.value_avg_cost > 0
           AND COALESCE(t.gross_units, 0) <= 0
           AND (i.created_at IS NULL OR julianday(:anchor) - julianday(substr(i.created_at, 1, 10)) > 90)
+          AND {IN_SCOPE}
     """, trail_params)
 
     stock_by_cat = q(f"""
         WITH {TRAILING},
         cat_cogs AS (
-            SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-                   SUM(t.cogs) AS trailing_cogs
+            SELECT c.top_level_name AS category, SUM(t.cogs) AS trailing_cogs
             FROM trailing t
-            LEFT JOIN items i ON i.item_id = t.item_id
-            LEFT JOIN categories c ON c.category_id = i.category_id
+            JOIN items i ON i.item_id = t.item_id
+            JOIN categories c ON c.category_id = i.category_id
+            WHERE c.top_level_name IN {CAT_IN}
             GROUP BY category
         ),
         cat_stock AS (
-            SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-                   SUM(s.qoh) AS qoh,
-                   SUM(s.value_avg_cost) AS stock_value
+            SELECT c.top_level_name AS category,
+                   SUM(s.qoh) AS qoh, SUM(s.value_avg_cost) AS stock_value
             FROM item_shops s
-            LEFT JOIN items i ON i.item_id = s.item_id
-            LEFT JOIN categories c ON c.category_id = i.category_id
-            WHERE s.qoh > 0
+            JOIN items i ON i.item_id = s.item_id
+            JOIN categories c ON c.category_id = i.category_id
+            WHERE s.qoh > 0 AND c.top_level_name IN {CAT_IN}
             GROUP BY category
         )
-        SELECT st.category, st.qoh, st.stock_value,
-               COALESCE(cc.trailing_cogs, 0) AS trailing_cogs
-        FROM cat_stock st
-        LEFT JOIN cat_cogs cc ON cc.category = st.category
+        SELECT st.category, st.qoh, st.stock_value, COALESCE(cc.trailing_cogs, 0) AS trailing_cogs
+        FROM cat_stock st LEFT JOIN cat_cogs cc ON cc.category = st.category
         WHERE st.stock_value > 0
         ORDER BY st.stock_value DESC
     """, trail_params)
@@ -1385,8 +1776,7 @@ if anchor:
     bike_cover = q(f"""
         WITH {TRAILING}
         SELECT im.model || CASE WHEN im.size IS NOT NULL THEN ' ' || im.size ELSE '' END AS label,
-               SUM(s.qoh) AS qoh,
-               SUM(s.value_avg_cost) AS stock_value,
+               SUM(s.qoh) AS qoh, SUM(s.value_avg_cost) AS stock_value,
                COALESCE(SUM(t.gross_units), 0) AS trailing_gross_units
         FROM item_shops s
         JOIN item_models im ON im.item_id = s.item_id
@@ -1394,352 +1784,29 @@ if anchor:
         WHERE s.qoh > 0 AND im.kind = 'complete'
         GROUP BY label
         HAVING SUM(s.value_avg_cost) > 0
-        ORDER BY stock_value DESC
-        LIMIT 30
+        ORDER BY stock_value DESC LIMIT 12
     """, trail_params)
-    stock_ready = True
 
-# ---------------------------------------------------------------- top products & channel
-
-top_products = q(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT COALESCE(i.description, '(unknown item)') AS product,
-           COALESCE(c.top_level_name, 'Uncategorised') AS category,
-           SUM(l.quantity) AS units, SUM(l.revenue) AS revenue,
-           SUM(l.revenue) - SUM(l.cogs) AS gross_profit
-    FROM lines l
-    LEFT JOIN items i ON i.item_id = l.item_id
-    LEFT JOIN categories c ON c.category_id = i.category_id
-    GROUP BY l.item_id
-    ORDER BY revenue DESC LIMIT 10
-""", params)
-top_rows = [[str(i + 1), r["product"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-             pct(margin_of(r["gross_profit"], r["revenue"]))]
-            for i, (_, r) in enumerate(top_products.iterrows())]
-top_body = html_table(["#", "Product", "Units", "Revenue", "Gross profit", "Margin"], top_rows,
-                      rank_col=0, name_col=1, muted_cols=(5,), empty_text="No sales in this period.")
-
-has_source = bool(q1("SELECT COUNT(*) n FROM pragma_table_info('sales') WHERE name='reference_number_source'")["n"])
-if not has_source:
-    shopify_body = (
-        '<div class="empty">Channel data is not in this snapshot — '
-        '<code>reference_number_source</code> is missing from the sales table.</div>'
-    )
-else:
-    shopify_summary = q1(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.revenue ELSE 0 END), 0) AS shopify_revenue,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.cogs ELSE 0 END), 0) AS shopify_cogs,
-          COALESCE(SUM(CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.quantity ELSE 0 END), 0) AS shopify_units,
-          COUNT(DISTINCT CASE WHEN UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY' THEN l.sale_id END) AS shopify_transactions,
-          COALESCE(SUM(l.revenue), 0) AS total_revenue
-        FROM lines l JOIN sales s ON s.sale_id = l.sale_id
-    """, params)
-    shopify_gp = shopify_summary["shopify_revenue"] - shopify_summary["shopify_cogs"]
-    shopify_share = (shopify_summary["shopify_revenue"] / shopify_summary["total_revenue"] * 100
-                     if shopify_summary["total_revenue"] else 0)
-    shopify_by_cat = q(f"""
-        WITH {VALID_SALE_CTE}
-        SELECT COALESCE(c.top_level_name, 'Uncategorised') AS category,
-               SUM(l.revenue) AS revenue, SUM(l.revenue) - SUM(l.cogs) AS gross_profit, SUM(l.quantity) AS units
-        FROM lines l
-        JOIN sales s ON s.sale_id = l.sale_id
-        LEFT JOIN items i ON i.item_id = l.item_id
-        LEFT JOIN categories c ON c.category_id = i.category_id
-        WHERE UPPER(TRIM(s.reference_number_source)) = 'SHOPIFY'
-        GROUP BY category
-        HAVING SUM(l.revenue) <> 0
-        ORDER BY revenue DESC
-    """, params)
-    shopify_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-                     pct(margin_of(r["gross_profit"], r["revenue"]))]
-                    for _, r in shopify_by_cat.head(10).iterrows()]
-    shopify_body = (
-        stats_html([
-            {"label": "Shopify revenue", "value": money(shopify_summary["shopify_revenue"])},
-            {"label": "Gross profit", "value": money(shopify_gp)},
-            {"label": "Margin", "value": pct(margin_of(shopify_gp, shopify_summary["shopify_revenue"]))},
-            {"label": "Share of revenue", "value": pct(shopify_share),
-             "foot": f"{shopify_summary['shopify_transactions']:,.0f} transactions, "
-                     f"{shopify_summary['shopify_units']:,.0f} units"},
-        ])
-        + html_table(["Category", "Units", "Revenue", "Gross profit", "Margin"], shopify_rows,
-                     name_col=0, muted_cols=(4,), empty_text="No Shopify-sourced sales in this period.")
-    )
-
-# ---------------------------------------------------------------- bike model drill-down
-#
-# The design's page-2 bar list, kept navigable. Its top level IS the designed
-# view, so the sheet itself stays pure output and every control that drives it
-# sits in the screen-only bar above the document — the same principle the
-# design applies to the period filter.
-
-if "drill_model" not in st.session_state:
-    st.session_state.drill_model = None
-    st.session_state.drill_trim = None
-
-drill_bar = st.container()
-with drill_bar:
-    st.markdown('<span class="mk-drillbar" style="display:none"></span>', unsafe_allow_html=True)
-    dc = st.columns([4, 4, 3, 3], gap="small", vertical_alignment="center")
-    crumb = " › ".join(filter(None, ["All models", st.session_state.drill_model, st.session_state.drill_trim]))
-    dc[0].markdown(f'<div class="lbl">Bike sales by model</div><div class="crumb">{esc(crumb)}</div>',
-                   unsafe_allow_html=True)
-    with dc[1]:
-        st.markdown('<span class="mk-kind" style="display:none"></span>', unsafe_allow_html=True)
-        kind_filter = st.segmented_control("Form", ["Complete bikes", "All forms"],
-                                           default=st.session_state.get("kind_filter", "Complete bikes"),
-                                           label_visibility="collapsed", key="kind_filter")
-        kind_filter = kind_filter or "Complete bikes"
-
-level = "model"
-drill_params = dict(params)
-where_extra = ""
-if st.session_state.drill_model:
-    where_extra += " AND im.model = :drill_model"
-    drill_params["drill_model"] = st.session_state.drill_model
-    if st.session_state.drill_trim:
-        level = "size"
-        group_expr = "COALESCE(im.size, '(no size recorded)')"
-        if st.session_state.drill_trim == "(no trim recorded)":
-            where_extra += " AND im.trim IS NULL"
-        else:
-            where_extra += " AND im.trim = :drill_trim"
-            drill_params["drill_trim"] = st.session_state.drill_trim
-    else:
-        level = "trim"
-        group_expr = "COALESCE(im.trim, '(no trim recorded)')"
-else:
-    group_expr = "im.model"
-
-kind_clause = "" if kind_filter == "All forms" else "AND im.kind = 'complete'"
-model_df = q(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT {group_expr} AS label,
-           SUM(l.revenue) AS revenue,
-           SUM(l.revenue) - SUM(l.cogs) AS gross_profit,
-           SUM(l.quantity) AS units
-    FROM lines l
-    JOIN item_models im ON im.item_id = l.item_id
-    WHERE im.model IS NOT NULL {kind_clause} {where_extra}
-    GROUP BY label
-    HAVING SUM(l.revenue) <> 0
-    ORDER BY revenue DESC
-""", drill_params)
-
-coverage = q1(f"""
-    WITH {VALID_SALE_CTE}
-    SELECT
-      (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind='complete') AS complete_rev,
-      (SELECT COALESCE(SUM(l.revenue),0) FROM lines l JOIN item_models im ON im.item_id=l.item_id WHERE im.kind<>'complete') AS other_rev
-""", params)
-
-model_rows = [{"label": r["label"], "revenue": r["revenue"], "gross_profit": r["gross_profit"]}
-              for _, r in model_df.iterrows()]
-model_shown, model_tot_rev, model_tot_gp = prep_bars(model_rows, limit=10)
-model_body = bars_html(model_shown, model_tot_rev, model_tot_gp,
-                       empty_text="No bike sales in this period.")
-
-with drill_bar:
-    drillable = [r["label"] for r in model_shown if not r["label"].startswith("OTHER (")] if level != "size" else []
-    with dc[2]:
-        if drillable:
-            st.markdown('<span class="mk-drill" style="display:none"></span>', unsafe_allow_html=True)
-            pick = st.selectbox("Drill into", ["Drill into…"] + drillable, label_visibility="collapsed",
-                                key=f"drill_pick_{level}_{st.session_state.drill_model or ''}")
-            if pick != "Drill into…":
-                if level == "model":
-                    st.session_state.drill_model = pick
-                else:
-                    st.session_state.drill_trim = pick
-                st.rerun()
-    with dc[3]:
-        st.markdown('<span class="mk-toggle" style="display:none"></span>', unsafe_allow_html=True)
-        if st.button("Back to all models", key="crumb_all",
-                     disabled=not st.session_state.drill_model, use_container_width=True):
-            st.session_state.drill_model = None
-            st.session_state.drill_trim = None
-            st.rerun()
-
-model_eyebrow = "Complete bikes only" if kind_filter == "Complete bikes" else "All forms"
-if level != "model":
-    model_eyebrow += f" · {esc(crumb)}"
-
-# ---------------------------------------------------------------- footnotes
-
-foot_left = ("Revenue is ex-VAT and net of discounts, counting only completed, non-voided sales — "
-             "the same basis as the Lightspeed sales report.")
-if adj_rev:
-    foot_left += (f" It includes ZAR {money(adj_rev)} of off-Lightspeed sales from Adjustments.xlsx; "
-                  f"Lightspeed alone accounts for ZAR {money(kpis['lightspeed_revenue'])}.")
-
-foot_right = ""
-if kpis["zero_cost_revenue"]:
-    zc_pct = kpis["zero_cost_revenue"] / kpis["revenue"] * 100 if kpis["revenue"] else 0
-    foot_right = (f"ZAR {money(kpis['zero_cost_revenue'])} of revenue ({pct(zc_pct)}) carries no unit cost — "
-                  "service and labour lines legitimately have no COGS, which is why Service Centre, "
-                  "Paarl Trails and Retul show margins near 100%.")
-if stock_ready:
-    foot_right += (" Stock turn is a proxy (COGS ÷ closing stock at cost) and is a point-in-time position, "
-                   "never period-filtered.")
-foot_right += " Category, model, stock and channel detail continue on the sheets that follow."
-
-TOTAL_SHEETS = 4 if stock_ready else 3
-
-# ================================================================== SHEET 1
-#
-# Rendered as one markdown block. Nothing on this sheet is interactive, so it
-# needs no Streamlit widgets, and a single block is both exact and cheap.
-
-st.markdown(
-    f'''<div class="sheet s1">
-  <div class="band">
-    <div>
-      <div class="eyebrow">Specialized Paarl · Lightspeed Retail</div>
-      <h1>Sales Dashboard</h1>
-      <div class="period">{period_label} · ZAR, ex-VAT and net of discounts</div>
-    </div>
-    <div class="bandright">
-      <div class="txt">
-        <div class="eyebrow">Page 1 of {TOTAL_SHEETS} · Performance</div>
-        <div class="synced">{esc(synced_text)}</div>
-        <div class="counts">{counts_text}</div>
-      </div>
-      {logo_img()}
-    </div>
-  </div>
-  <div class="inner">
-    {kpi_strip([
-        {"label": "Revenue", "value": money(kpis["revenue"]),
-         "foot": f'{kpis["transactions"]:,} transactions',
-         "delta": sply_delta(kpis["revenue"], sply["revenue"]) if sply else None},
-        {"label": "Gross profit", "value": money(gp),
-         "foot": f'After {compact(kpis["cogs"])} COGS',
-         "delta": sply_delta(gp, sply["gp"]) if sply else None},
-        {"label": "Gross margin", "value": pct(margin),
-         "foot": "Flattered by zero-COGS service lines",
-         "delta": sply_delta(margin, sply["margin"], is_points=True) if sply else None},
-        {"label": "Average sale", "value": money(avg_sale),
-         "foot": f'{kpis["units"]:,.0f} units sold',
-         "delta": sply_delta(avg_sale, sply["avg"]) if sply else None},
-    ])}
-    <section>
-      {section_header("Sales by category", "Revenue ZAR · margin", "normal")}
-      {cat_body}
-    </section>
-    <section>
-      {section_header("Budget versus actual", budget_meta, "tight")}
-      {budget_body}
-    </section>
-    <section>
-      {section_header("Operating health", "Stock is a point-in-time position", "loose")}
-      <div class="cards">
-        {stat_card("Accessory attach", pct(attach_rate),
-                   f'{with_attach:,} of {bike_txns:,} bike sales',
-                   [{"label": "Attached revenue", "value": money(attach_summary["attached_revenue"])},
-                    {"label": "Per bike sold",
-                     "value": money(attach_summary["attached_revenue"] / bike_txns if bike_txns else 0)}])}
-        {stat_card("Discount leakage", pct(leak_pct), "of gross list revenue",
-                   [{"label": "Discount given", "value": money(discount["discount_given"])},
-                    {"label": "Lines discounted", "value": pct(disc_line_pct)}],
-                   figure_colour="var(--clay)")}
-        {stat_card("Stock and turn",
-                   f"{turn:.1f}×" if stock_ready and turn else "—",
-                   f"{52 / turn:.1f} weeks of cover" if stock_ready and turn else "No stock snapshot",
-                   [{"label": "Stock at cost",
-                     "value": money(stock_summary["stock_value"]) if stock_ready else "—"},
-                    {"label": "Aged, no 12m sales",
-                     "value": money(dead_total["value"]) if stock_ready else "—",
-                     "colour": "var(--clay)"}])}
-      </div>
-    </section>
-  </div>
-</div>''',
-    unsafe_allow_html=True,
-)
-
-# ================================================================== SHEET 2
-
-st.markdown(
-    f'''<div class="sheet sn">
-  {page_header("Where the revenue comes from", f"Specialized Paarl · Page 2 of {TOTAL_SHEETS}")}
-  <section>
-    {section_header("Bike sales by model", model_eyebrow, "tight", level=3)}
-    {model_body}
-  </section>
-  <section>
-    {section_header("Top 10 products by revenue", "ZAR, ex-VAT net of discounts", "sub", level=3)}
-    {top_body}
-  </section>
-  <footer class="notes">
-    <div>{foot_left}</div>
-    <div>{foot_right}</div>
-  </footer>
-</div>''',
-    unsafe_allow_html=True,
-)
-
-# ================================================================== SHEET 3
-
-attach_rows = [[r["category"], f'{r["units"]:,.0f}', money(r["revenue"]), money(r["gross_profit"]),
-                pct(margin_of(r["gross_profit"], r["revenue"]))]
-               for _, r in attach_by_cat.head(8).iterrows()]
-
-coverage_note = ""
-if kind_filter == "Complete bikes" and coverage["other_rev"]:
-    coverage_note = (f'<div class="note">Complete bikes only: ZAR {money(coverage["complete_rev"])}. '
-                     f'A further ZAR {money(coverage["other_rev"])} of bike-category revenue is framesets, '
-                     'bare frames, build kits and rentals — switch the model list to "All forms" to include it.</div>')
-
-st.markdown(
-    f'''<div class="sheet sn">
-  {page_header("Attach rate and channel", f"Specialized Paarl · Page 3 of {TOTAL_SHEETS}")}
-  <section>
-    {section_header("Accessory attach rate on bike sales", "Same transaction as a complete bike", "sub", level=3)}
-    {stats_html([
-        {"label": "Bike sales", "value": f"{bike_txns:,}"},
-        {"label": "With accessory", "value": pct(attach_rate),
-         "foot": f"{with_attach:,} of {bike_txns:,}"},
-        {"label": "Attached revenue", "value": money(attach_summary["attached_revenue"]),
-         "foot": f'{attach_summary["attached_units"]:,.0f} units'},
-        {"label": "Per bike", "value": money(attach_summary["attached_revenue"] / bike_txns if bike_txns else 0)},
-    ])}
-    {html_table(["Attached category", "Units", "Revenue", "Gross profit", "Margin"], attach_rows,
-                name_col=0, muted_cols=(4,), empty_text="No attached sales in this period.")}
-    {coverage_note}
-  </section>
-  <section>
-    {section_header("Shopify sales breakdown", "Online channel", "sub", level=3)}
-    {shopify_body}
-  </section>
-</div>''',
-    unsafe_allow_html=True,
-)
-
-# ================================================================== SHEET 4
-
-if stock_ready:
     stock_cat_rows = []
-    for _, r in stock_by_cat.head(8).iterrows():
+    for _, r in stock_by_cat.iterrows():
         t = r["trailing_cogs"] / r["stock_value"] if r["stock_value"] else None
-        stock_cat_rows.append([
-            r["category"], f'{r["qoh"]:,.0f}', money(r["stock_value"]), money(r["trailing_cogs"]),
-            f"{t:.1f}×" if t else "—", f"{52 / t:.1f}" if t else "—",
-        ])
+        stock_cat_rows.append([r["category"], f'{r["qoh"]:,.0f}', money(r["stock_value"]),
+                               money(r["trailing_cogs"]),
+                               f"{t:.1f}×" if t else "—", f"{52 / t:.1f}" if t else "—"])
 
     cover_rows = []
-    for _, r in bike_cover.head(10).iterrows():
+    for _, r in bike_cover.iterrows():
         sold = r["trailing_gross_units"] or 0
         weeks = (r["qoh"] * 52 / sold) if sold > 0 else None
         weeks_cell = "no sales in 12m" if weeks is None else f"{weeks:.1f}"
         if weeks is None or weeks > 40:
             weeks_cell = Raw(f'<span style="color:var(--clay)">{esc(weeks_cell)}</span>')
-        cover_rows.append([r["label"], f'{r["qoh"]:,.0f}', money(r["stock_value"]), f"{sold:,.0f}", weeks_cell])
+        cover_rows.append([r["label"], f'{r["qoh"]:,.0f}', money(r["stock_value"]),
+                           f"{sold:,.0f}", weeks_cell])
 
     st.markdown(
-        f'''<div class="sheet sn">
-  {page_header("Stock position", f"Specialized Paarl · Page 4 of {TOTAL_SHEETS}")}
+        f'''<div class="sheet sn appendix">
+  {page_header("Stock position", "Specialized Paarl · Appendix B")}
   <section>
     {section_header("Stock on hand and stock turn",
                     f"Held now · trade over the 12 months to {anchor} · not period-filtered",
@@ -1751,8 +1818,8 @@ if stock_ready:
          "foot": f"{compact(trailing_cogs)} COGS over 12m"},
         {"label": "Weeks of cover", "value": f"{52 / turn:.1f}" if turn else "—",
          "foot": "At the trailing sales rate"},
-        {"label": "Aged stock", "value": money(dead_total["value"]),
-         "colour": "var(--clay)", "foot": f'{dead_total["skus"]:,} SKUs, no sales in 12m'},
+        {"label": "Aged stock", "value": money(dead_total["value"]), "colour": "var(--clay)",
+         "foot": f'{dead_total["skus"]:,} SKUs, no sales in 12m'},
     ])}
   </section>
   <section>
@@ -1764,6 +1831,9 @@ if stock_ready:
     {section_header("Bike cover by model and size", "Complete bikes held now", "sub", level=3)}
     {html_table(["Model / size", "Units held", "At cost", "12m sold", "Weeks cover"],
                 cover_rows, name_col=0)}
+    <div class="note">Stock turn is a proxy — trailing COGS divided by closing stock at cost —
+    and is a point-in-time position, never period-filtered. Scoped, like the report, to the
+    budgeted categories and Wheelsets.</div>
   </section>
 </div>''',
         unsafe_allow_html=True,
