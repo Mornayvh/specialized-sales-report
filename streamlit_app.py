@@ -677,16 +677,47 @@ def get_conn():
     return conn
 
 
+def snapshot_key():
+    """A fingerprint of the snapshot file, carried as a cache key.
+
+    Every query below is memoised, and the memo has to fall the moment the
+    data underneath it changes. On Streamlit Cloud a push restarts the process
+    and empties the cache anyway — but locally `npm run refresh` replaces
+    snapshot.sqlite under a running server, and without this the app would go
+    on serving the previous snapshot's figures indefinitely.
+
+    NOTE the parameter this is passed as must NOT be named with a leading
+    underscore: st.cache_data deliberately excludes underscore-prefixed
+    arguments from the hash, which would exclude the very thing being keyed on.
+    """
+    info = DB_PATH.stat()
+    return info.st_mtime_ns, info.st_size
+
+
+# Streamlit re-runs this whole script on every interaction — every widget
+# click, every period change — so an uncached query is paid for again each
+# time even when nothing it reads has moved. The snapshot is immutable for the
+# life of a process, which makes every query on it a pure function of (sql,
+# params): exactly what st.cache_data is for.
+@st.cache_data(show_spinner=False, max_entries=256)
+def _query(sql, params, snapshot):
+    return pd.read_sql_query(sql, get_conn(), params=params)
+
+
+@st.cache_data(show_spinner=False, max_entries=256)
+def _query_one(sql, params, snapshot):
+    row = get_conn().execute(sql, params).fetchone()
+    return dict(row) if row else None
+
+
 def q(sql, params=None):
     """Run a query, return a DataFrame."""
-    return pd.read_sql_query(sql, get_conn(), params=params or {})
+    return _query(sql, params or {}, snapshot_key())
 
 
 def q1(sql, params=None):
     """Run a query, return the single row as a dict (or None)."""
-    cur = get_conn().execute(sql, params or {})
-    row = cur.fetchone()
-    return dict(row) if row else None
+    return _query_one(sql, params or {}, snapshot_key())
 
 
 # Mirrors VALID_SALE_CTE in server.js exactly.
@@ -1061,6 +1092,7 @@ ADJ_LOOKUP = q("""
     FROM items i
     LEFT JOIN categories c ON c.category_id = i.category_id
     LEFT JOIN item_models im ON im.item_id = i.item_id
+    WHERE UPPER(TRIM(i.description)) IN (SELECT UPPER(TRIM(description)) FROM adjustments)
 """).drop_duplicates("key").set_index("key")
 
 
@@ -1716,16 +1748,14 @@ if anchor:
         GROUP BY sl.item_id
     )
     """
-    IN_SCOPE = f"""
-        EXISTS (SELECT 1 FROM items i2 JOIN categories c2 ON c2.category_id = i2.category_id
-                WHERE i2.item_id = s.item_id AND c2.top_level_name IN {CAT_IN})
-    """
-
     stock_summary = q1(f"""
         SELECT COALESCE(SUM(s.value_avg_cost), 0) AS stock_value,
                COALESCE(SUM(s.qoh), 0) AS stock_units,
                COUNT(*) AS stocked_skus
-        FROM item_shops s WHERE s.qoh > 0 AND {IN_SCOPE}
+        FROM item_shops s
+        JOIN items i ON i.item_id = s.item_id
+        JOIN categories c ON c.category_id = i.category_id
+        WHERE s.qoh > 0 AND c.top_level_name IN {CAT_IN}
     """, trail_params)
     trailing_cogs = q1(f"""
         WITH {TRAILING}
@@ -1740,12 +1770,13 @@ if anchor:
         WITH {TRAILING}
         SELECT COALESCE(SUM(s.value_avg_cost), 0) AS value, COUNT(*) AS skus
         FROM item_shops s
-        LEFT JOIN items i ON i.item_id = s.item_id
+        JOIN items i ON i.item_id = s.item_id
+        JOIN categories c ON c.category_id = i.category_id
         LEFT JOIN trailing t ON t.item_id = s.item_id
         WHERE s.qoh > 0 AND s.value_avg_cost > 0
+          AND c.top_level_name IN {CAT_IN}
           AND COALESCE(t.gross_units, 0) <= 0
           AND (i.created_at IS NULL OR julianday(:anchor) - julianday(substr(i.created_at, 1, 10)) > 90)
-          AND {IN_SCOPE}
     """, trail_params)
 
     stock_by_cat = q(f"""
