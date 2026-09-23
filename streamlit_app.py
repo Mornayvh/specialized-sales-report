@@ -58,11 +58,13 @@ import base64
 import html as html_lib
 import re
 import hmac
+import time
 import sqlite3
 import datetime as dt
 from pathlib import Path
 
 import pandas as pd
+import requests
 import streamlit as st
 
 DB_PATH = Path(__file__).parent / "snapshot.sqlite"
@@ -473,6 +475,17 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
   font-family: var(--font-body); gap: 8px !important;
 }
 .lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); margin-bottom: 4px; }
+/* The sync row. A hairline splits it from the period controls above, and it
+   runs to the bar's own edges rather than the content's — the same full-bleed
+   divider the design uses inside a panel. */
+.ctrlrule { border-top: 1px solid var(--color-divider); margin: 2px -14px 8px; }
+.syncage { font-family: var(--font-heading); font-size: 14px; line-height: 1.3; }
+.syncstat { font-size: 11.5px; line-height: 1.4; margin-top: 1px; }
+.syncnote { font-size: 11px; line-height: 1.45; color: var(--color-neutral-700); margin-top: 7px; }
+.syncnote code {
+  font-size: 10.5px; background: var(--color-neutral-200); padding: 1px 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 /* The coverage caveat under the appendix tables, at the design's footnote scale. */
 .note { font-size: 10.5px; line-height: 1.5; color: var(--color-neutral-700); margin-top: 8px; }
 
@@ -483,11 +496,32 @@ div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .
    class of their own, so this is the only way to style one widget without
    styling every widget on the page. The selects and the checkbox are reached
    through their own stable data-testid instead. */
-div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button {
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button,
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button {
   font-family: var(--font-body) !important; font-size: 11px !important; letter-spacing: 0.1em;
   text-transform: uppercase; padding: 8px 12px !important; border-radius: 0 !important;
   min-height: 0 !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button {
   background: var(--color-accent-800) !important; border: 1px solid var(--color-accent-800) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button {
+  background: #fff !important; border: 1px solid var(--color-neutral-400) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button p {
+  font-size: 11px !important; color: var(--color-accent-800) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button:hover:not(:disabled) {
+  background: var(--color-accent-900) !important; border-color: var(--color-accent-900) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button:hover:not(:disabled) p {
+  color: #fff !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button:disabled {
+  border-color: var(--color-neutral-300) !important;
+}
+div[data-testid="stElementContainer"]:has(.mk-sync) + div[data-testid="stElementContainer"] button:disabled p {
+  color: var(--color-neutral-500) !important;
 }
 div[data-testid="stElementContainer"]:has(.mk-print) + div[data-testid="stElementContainer"] button p {
   font-size: 11px !important; color: #fff !important;
@@ -1172,10 +1206,286 @@ def fy_label(fy):
     return f"FY{fy} · {fy - 1}/{str(fy)[2:]}"
 
 
+# ---------------------------------------------------------------- sync
+#
+# This app cannot sync anything itself, by design: it reads snapshot.sqlite and
+# holds no Lightspeed credential (see the module docstring). The sync that
+# matters runs in GitHub Actions — .github/workflows/daily-sync.yml pulls from
+# Lightspeed, rebuilds the snapshot and pushes it, which on Streamlit Cloud
+# redeploys this app with the new data.
+#
+# So the button does not sync. It asks GitHub to run that workflow, then
+# watches the run and reports what happened — including, importantly, when the
+# run fails. A scheduled run has been failing silently every night since the
+# workflow was added; nothing in the report said so, and the only visible
+# symptom was a "Synced" date that quietly stopped moving.
+GITHUB_API = "https://api.github.com"
+SYNC_WORKFLOW = "daily-sync.yml"
+SYNC_REF = "main"
+DEFAULT_REPO = "Mornayvh/specialized-sales-report"
+# Paarl keeps UTC+2 all year and observes no DST, so a fixed offset is exact
+# rather than an approximation. GitHub timestamps are UTC; the snapshot's
+# exported_at is UTC too (it carries a trailing Z), and was previously rendered
+# as if it were local — which showed every sync two hours earlier than it ran.
+SAST = dt.timezone(dt.timedelta(hours=2))
+
+
+def secret(name, default=""):
+    """One Streamlit secret, or the default when secrets are not configured."""
+    try:
+        return st.secrets.get(name, default)
+    except Exception:
+        return default
+
+
+def github(method, path, token="", body=None, timeout=10):
+    """One GitHub API call.
+
+    Returns (ok, status, payload). On failure `payload` is GitHub's own message
+    so the panel can show the real reason — a missing token and a disabled
+    workflow are different problems and must not read the same.
+    """
+    headers = {"Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        r = requests.request(method, GITHUB_API + path, headers=headers,
+                             json=body, timeout=timeout)
+    except requests.RequestException as exc:
+        return False, 0, f"Could not reach GitHub ({type(exc).__name__})."
+    if r.status_code == 204:          # dispatch accepted; no body by design
+        return True, 204, None
+    try:
+        payload = r.json()
+    except ValueError:
+        payload = None
+    if not r.ok:
+        message = payload.get("message") if isinstance(payload, dict) else None
+        return False, r.status_code, message or r.reason
+    return True, r.status_code, payload
+
+
+@st.cache_data(ttl=120, show_spinner=False, max_entries=8)
+def _sync_runs(repo, token, limit, bucket):
+    """Cached read. `bucket` is a coarsened clock — see sync_runs below."""
+    path = f"/repos/{repo}/actions/workflows/{SYNC_WORKFLOW}/runs?per_page={limit}"
+    # Fail fast. The report is the product and the sync status is an accessory,
+    # so a slow GitHub must not hold up the two review pages; measured, this
+    # endpoint answers anywhere between 0.5s and 3.2s.
+    ok, status, payload = github("GET", path, token, timeout=6)
+    if not ok and token and status in (401, 403):
+        ok, status, payload = github("GET", path, timeout=6)
+    if not ok:
+        return None, (status, payload)
+    return payload.get("workflow_runs", []), None
+
+
+def sync_runs(repo, token, limit=1, freshness=30):
+    """The most recent runs of the sync workflow, newest first.
+
+    Reading runs needs no token on a public repo, so the panel can report a
+    failing nightly sync before anyone configures one — and keeps reporting it
+    if the configured token is wrong, by retrying the read unauthenticated. A
+    bad token should cost you the button, not the diagnosis.
+
+    On a private repo the unauthenticated read 404s and the panel says so
+    rather than showing "never run", which would be a lie.
+
+    Streamlit re-runs this script on every interaction, so an uncached call
+    here would put GitHub's latency in front of every period change. The answer
+    is memoised against a clock coarsened to `freshness` seconds: 30s while
+    idle, since a nightly run changes once a day, and 5s while a run is being
+    watched, which is the poll interval.
+    """
+    return _sync_runs(repo, token, limit, int(time.time() // max(1, freshness)))
+
+
+def start_sync(repo, token):
+    """Ask GitHub to run the sync workflow. Returns None, or an error string."""
+    ok, status, payload = github(
+        "POST", f"/repos/{repo}/actions/workflows/{SYNC_WORKFLOW}/dispatches",
+        token, {"ref": SYNC_REF})
+    if ok:
+        return None
+    if status == 401:
+        return "GitHub rejected the token (401). Check github_token in Streamlit secrets."
+    if status == 403:
+        return f"GitHub refused the request (403): {payload}"
+    if status == 404:
+        return (f"Not found (404) — the token is missing the Actions write permission "
+                f"on {repo}, or {SYNC_WORKFLOW} is not on {SYNC_REF}.")
+    if status == 422:
+        return f"GitHub could not start the run (422): {payload}"
+    return f"{status}: {payload}" if status else str(payload)
+
+
+def utc_to_sast(stamp):
+    """An ISO-8601 UTC timestamp as an aware SAST datetime, or None."""
+    if not stamp:
+        return None
+    text = str(stamp).replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(SAST)
+
+
+def when_text(moment):
+    """`today at 21:00`, `yesterday at 21:00`, or `on 22 Sep 2026 at 21:00`."""
+    if moment is None:
+        return "at an unknown time"
+    days = (dt.datetime.now(SAST).date() - moment.date()).days
+    if days == 0:
+        return f"today at {moment:%H:%M}"
+    if days == 1:
+        return f"yesterday at {moment:%H:%M}"
+    return f"on {fmt_day(moment.date())} at {moment:%H:%M}"
+
+
+# GitHub reports a finished run as a noun ("failure", "timed_out"). The panel
+# reads as a sentence, so each becomes the verb a person would use.
+RUN_VERBS = {
+    "success": "succeeded",
+    "failure": "failed",
+    "cancelled": "was cancelled",
+    "timed_out": "timed out",
+    "startup_failure": "failed to start",
+    "action_required": "needs attention",
+    "skipped": "was skipped",
+    "stale": "went stale",
+    "neutral": "finished inconclusively",
+}
+
+
+def run_state(run):
+    """(headline, colour, is_finished) for one workflow run."""
+    if run is None:
+        return "The sync workflow has never run.", "var(--clay)", True
+    when = when_text(utc_to_sast(run.get("run_started_at") or run.get("created_at")))
+    if run.get("status") != "completed":
+        return f"Sync running, started {when}.", "var(--color-accent-800)", False
+    verdict = run.get("conclusion")
+    verb = RUN_VERBS.get(verdict, "did not finish")
+    colour = "var(--color-neutral-700)" if verdict == "success" else "var(--clay)"
+    return f"Last sync {verb} {when}.", colour, True
+
+
+def sync_controls():
+    """The control bar's second row: how fresh the data is, and the button.
+
+    Draws only from local state, so it never waits on GitHub. The run-status
+    line is the one part that needs the network, and it is left as an empty
+    slot for sync_status() to fill once the report itself has rendered.
+    """
+    left, right = st.columns([7, 2.4], gap="small", vertical_alignment="center")
+    with left:
+        if snapshot_taken:
+            days = (dt.datetime.now(SAST).date() - snapshot_taken.date()).days
+            age = "today" if days == 0 else "yesterday" if days == 1 else f"{days} days old"
+            age_text = (f"Data as of {fmt_day(snapshot_taken.date())}, "
+                        f"{snapshot_taken:%H:%M} · {age}")
+            # Stale data is an unfavourable value, which is what clay is for.
+            age_colour = "var(--clay)" if days >= 2 else "var(--color-neutral-700)"
+        else:
+            age_text, age_colour = "Snapshot date unknown", "var(--clay)"
+        st.markdown(f'<div class="syncage" style="color:{age_colour}">{esc(age_text)}</div>',
+                    unsafe_allow_html=True)
+        slot = st.empty()
+
+    token = secret("github_token", "")
+    with right:
+        st.markdown('<span class="mk-sync" style="display:none"></span>', unsafe_allow_html=True)
+        # Busy means a run WE started and are still watching. A run someone
+        # else started does not disable the button: GitHub queues a second
+        # dispatch harmlessly, and blocking on another party's run would need
+        # the network read this row is deliberately not waiting for.
+        busy = bool(st.session_state.get("sync_watch"))
+        if st.button("Syncing…" if busy else "Sync now", key="sync_now",
+                     use_container_width=True, disabled=busy or not token):
+            repo = secret("github_repo", DEFAULT_REPO)
+            runs, _ = sync_runs(repo, token, limit=1)
+            latest = runs[0] if runs else None
+            error = start_sync(repo, token)
+            st.session_state.sync_error = error
+            if not error:
+                # Remember which run was newest BEFORE the dispatch: the
+                # dispatch returns no run id, so the first run to appear with a
+                # different id is the one we just asked for. Comparing wall
+                # clocks across two machines instead would invite a race where
+                # a run that started a second "before" we asked is taken as ours.
+                st.session_state.sync_watch = str(latest.get("id")) if latest else "none"
+                st.session_state.sync_started = False
+                _sync_runs.clear()
+            st.rerun(scope="app")
+
+    if not token:
+        st.markdown(
+            '<div class="syncnote">To enable the button, add a <code>github_token</code> secret — '
+            'a fine-grained personal access token scoped to this repository with '
+            '<strong>Actions: read and write</strong>. On Streamlit Cloud that is '
+            'Settings → Secrets; locally it is <code>.streamlit/secrets.toml</code>. '
+            'The status line needs no token.</div>',
+            unsafe_allow_html=True,
+        )
+    if st.session_state.get("sync_error"):
+        st.markdown(f'<div class="syncnote" style="color:var(--clay)">'
+                    f'{esc(st.session_state["sync_error"])}</div>', unsafe_allow_html=True)
+    return slot
+
+
+def sync_status():
+    """Fill the status slot from GitHub, and notice when our run has finished.
+
+    Called after the sheets are emitted so the report never waits on GitHub's
+    API, which was measured answering between 0.5s and 3.2s.
+    """
+    repo, token = secret("github_repo", DEFAULT_REPO), secret("github_token", "")
+    watching = st.session_state.get("sync_watch")
+    # Fresher while a run is in flight; see sync_runs.
+    runs, failure = sync_runs(repo, token, limit=1, freshness=5 if watching else 30)
+    latest = runs[0] if runs else None
+
+    if failure:
+        status_code, detail = failure
+        headline, colour, finished = (
+            f"Cannot read the sync status ({status_code}): {detail}", "var(--clay)", True)
+    else:
+        headline, colour, finished = run_state(latest)
+
+    if watching and latest and str(latest.get("id")) != str(watching):
+        st.session_state.sync_started = True          # our run has appeared
+    if watching and st.session_state.get("sync_started") and finished:
+        # The workflow pushes a new snapshot.sqlite, which on Streamlit Cloud
+        # redeploys this app from scratch. When it does not — running locally,
+        # or a run that changed nothing — the caches still have to go, or the
+        # report would keep serving figures from the previous snapshot.
+        st.session_state.sync_watch = None
+        st.session_state.sync_started = False
+        st.cache_data.clear()
+        st.rerun(scope="app")
+
+    log_link = ""
+    if latest and latest.get("html_url"):
+        log_link = (f' · <a href="{esc(latest["html_url"])}" target="_blank" '
+                    f'rel="noopener">view the log</a>')
+    with SYNC_SLOT.container():
+        st.markdown(f'<div class="syncstat" style="color:{colour}">{esc(headline)}{log_link}</div>',
+                    unsafe_allow_html=True)
+
+
 # ---------------------------------------------------------------- control bar
 #
 # The two review pages are pure output, so every control that drives them sits
 # in this bar above the document and is excluded from print.
+
+meta_row = q1("SELECT value FROM snapshot_meta WHERE key = 'exported_at'")
+snapshot_taken = utc_to_sast(meta_row["value"]) if meta_row else None
+synced_text = (f"Synced {fmt_day(snapshot_taken.date())}, {snapshot_taken:%H:%M}"
+               if snapshot_taken else "Sync status unavailable")
 
 ctrl = st.container()
 with ctrl:
@@ -1204,6 +1514,9 @@ with ctrl:
         st.markdown('<span class="mk-print" style="display:none"></span>', unsafe_allow_html=True)
         print_clicked = st.button("Print to PDF", key="print_pdf", use_container_width=True)
 
+    st.markdown('<div class="ctrlrule"></div>', unsafe_allow_html=True)
+    SYNC_SLOT = sync_controls()
+
 month_from, month_to = month_window(month_key)
 fy_from, fy_to = fy_window(fy_key)
 
@@ -1217,13 +1530,6 @@ if print_appendix:
 
 if print_clicked:
     st.components.v1.html("<script>window.parent.print();</script>", height=0, width=0)
-
-meta_row = q1("SELECT value FROM snapshot_meta WHERE key = 'exported_at'")
-synced_text = "Sync status unavailable"
-if meta_row:
-    stamp = dt.datetime.fromisoformat(meta_row["value"][:19])
-    synced_text = f"Synced {fmt_day(stamp.date())}, {stamp:%H:%M}"
-
 
 # ---------------------------------------------------------------- budget
 #
@@ -1869,3 +2175,15 @@ if anchor:
 </div>''',
         unsafe_allow_html=True,
     )
+
+
+# ---------------------------------------------------------------- sync status
+#
+# Last, so the report is on screen before anything waits on GitHub. Polled only
+# while a run we started is in flight: left permanently on a timer it would
+# call the API every few seconds for the life of every open tab, to report a
+# figure that changes once a day.
+if st.session_state.get("sync_watch"):
+    st.fragment(sync_status, run_every=5, key="syncpoll")()
+else:
+    sync_status()

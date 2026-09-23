@@ -1,2 +1,6 @@
 streamlit>=1.38
 pandas>=2.2
+# The sync button talks to the GitHub Actions API. Streamlit already pulls
+# requests in transitively; it is declared here because this app imports it
+# directly, and a transitive dependency is not a promise.
+requests>=2.32
